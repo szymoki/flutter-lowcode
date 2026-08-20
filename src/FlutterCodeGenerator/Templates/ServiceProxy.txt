@@ -1,0 +1,7 @@
+// Generated from IR - stub for developer
+import '{{InterfaceFile}}';
+{{ModelImports}}
+
+class {{NotionName}}ServiceProxy implements {{InterfaceName}} {
+{{ProxyMethods}}
+}

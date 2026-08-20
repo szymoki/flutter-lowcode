@@ -1,0 +1,11 @@
+.git
+.gitignore
+**/bin
+**/obj
+**/.dart_tool
+**/build
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+*.md
+.env*
+.DS_Store

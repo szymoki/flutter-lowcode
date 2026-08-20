@@ -1,0 +1,25 @@
+# Flutter Web - build i serwowanie
+FROM ghcr.io/cirruslabs/flutter:stable AS build
+WORKDIR /app
+
+# Kopiujemy projekt Flutter (po wygenerowaniu plików przez .NET)
+COPY flutter_web/ .
+
+# Konfiguracja platformy web (generator nie tworzy web/)
+RUN flutter create . --platforms web
+
+RUN flutter pub get && flutter build web --release
+
+# Stage: serwer www
+FROM nginx:alpine
+COPY --from=build /app/build/web /usr/share/nginx/html
+RUN echo 'server { \
+    listen 80; \
+    root /usr/share/nginx/html; \
+    index index.html; \
+    location / { try_files $uri $uri/ /index.html; } \
+    gzip on; \
+    gzip_types text/plain application/javascript application/wasm; \
+  }' > /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

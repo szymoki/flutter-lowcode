@@ -1,0 +1,53 @@
+Use case Add order Main scenario
+{user ? cashier}
+00: Cashier <select> add order
+01: Cashier <enter> order
+02: System <show> add order form
+03: Cashier <select> add
+04: System <check> order
+[order ? OK]
+05: System <update> order
+06: System <show> order success message
+07: Cashier <select> ok
+-> end ! OK
+Scenario
+02: -"-
+A1: Cashier <select> cancel
+-> end ! CANCEL
+Scenario
+04: -"-
+[order ? notOK]
+B1: System <show> order error message
+B2: Cashier <select> close
+-> end ! notOK
+Scenario
+B1: -"-
+C1: Cashier <select> correct
+-> rejoin 01
+Use case Show order list Main scenario
+{user ? cashier}
+00: Cashier <select> show order list
+01: System <read> order list
+02: System <show> order list window
+03: Cashier <select> close
+-> end ! OK
+Scenario
+03: -"-
+A1: Cashier <select> order list
+A2: Cashier <invoke> Find order, Add order, Delete order
+-> rejoin 01
+Use case Delete order Main scenario
+{user ? cashier; order}
+00: Cashier <select> delete order
+01: System <show> delete confirmation message
+02: Cashier <select> delete
+03: System <delete> order
+04: System <show> order deleted message
+05: Cashier <select> ok
+-> end ! OK
+Scenario
+01: -"-
+A1: Cashier <select> cancel
+-> end ! CANCEL
+Use case Add order form
+{user ? cashier}

@@ -1,0 +1,53 @@
+// Generated from IR
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../presenters/{{PresenterSnake}}_presenter.dart';
+import '../controllers/{{ControllerSnake}}_controller.dart';
+
+class {{ViewName}}View extends StatefulWidget {
+  final {{ControllerName}} controller;
+
+  const {{ViewName}}View({super.key, required this.controller});
+
+  @override
+  State<{{ViewName}}View> createState() => _{{ViewName}}ViewState();
+}
+
+class _{{ViewName}}ViewState extends State<{{ViewName}}View> {
+{{Fields}}
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<{{PresenterName}}>().show();
+    });
+  }
+
+  @override
+  void dispose() {
+{{DisposeCalls}}
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<{{PresenterName}}>(
+      builder: (context, presenter, child) {
+        if (!presenter.isVisible) return const SizedBox.shrink();
+        return Scaffold(
+          appBar: AppBar(title: const Text('{{ViewName}}')),
+          body: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+{{BodyChildren}}
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}

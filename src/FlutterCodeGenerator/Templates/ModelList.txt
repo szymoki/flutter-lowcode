@@ -1,0 +1,5 @@
+// Generated from IR
+class {{ClassName}} {
+  final List<{{ItemType}}> items;
+  const {{ClassName}}({required this.items});
+}

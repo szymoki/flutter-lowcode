@@ -1,0 +1,95 @@
+Use case Start Main scenario
+00: User <select> application
+01: System <show> main menu
+02: User <invoke> Show order list, Find order, Add order
+-> rejoin 01
+
+Use case Find order Main scenario
+00: Cashier <select> find order
+01: System <show> order search form
+02: Cashier <enter> order search
+03: Cashier <select> search
+04: System <check> order search
+[order search ? valid]
+05: System <read> order
+06: System <show> order window
+07: Cashier <select> close
+-> end ! OK
+Scenario
+02: -"-
+C1: Cashier <select> cancel
+-> end ! CANCEL
+Scenario
+04: -"-
+[order search ? invalid]
+A1: System <show> search error message
+A2: Cashier <select> close
+-> end ! notOK
+
+Use case Show order list Main scenario
+{user ? cashier}
+00: Cashier <select> show order list
+01: System <read> order list
+02: System <show> order list window
+03: Cashier <select> close
+-> end ! OK
+Scenario
+03: -"-
+A1: Cashier <select> order list
+A2: Cashier <invoke> Find order, Add order, Delete order
+-> rejoin 01
+
+Use case Add order Main scenario
+{user ? cashier}
+00: Cashier <select> add order
+01: System <show> add order form
+02: Cashier <enter> order
+03: Cashier <select> add
+04: System <check> order
+[order ? OK]
+05: System <update> order
+06: System <show> order success message
+07: Cashier <select> ok
+-> end ! OK
+Scenario
+02: -"-
+A1: Cashier <select> cancel
+-> end ! CANCEL
+Scenario
+04: -"-
+[order ? notOK]
+B1: System <show> order error message
+B2: Cashier <select> close
+-> end ! notOK
+Scenario
+B1: -"-
+C1: Cashier <select> correct
+-> rejoin 01
+
+Use case Delete order Main scenario
+{user ? cashier; order}
+00: Cashier <select> delete order
+01: System <show> delete confirmation message
+02: Cashier <select> delete
+03: System <delete> order
+04: System <show> order deleted message
+05: Cashier <select> ok
+-> end ! OK
+Scenario
+01: -"-
+A1: Cashier <select> cancel
+-> end ! CANCEL
+
+Data order {
+    number : integer,
+    title : text,
+    dates : text
+}
+
+Data order list {
+    orders : [order]
+}
+
+Data order search {
+    title : text
+}

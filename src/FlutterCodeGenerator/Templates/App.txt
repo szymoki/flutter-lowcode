@@ -1,0 +1,42 @@
+// Generated from IR
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+{{PresenterImports}}
+{{UseCaseImports}}
+{{ControllerImports}}
+{{ViewImports}}
+{{ServiceProxyImports}}
+
+class App extends StatefulWidget {
+  const App({super.key});
+
+  @override
+  State<App> createState() => _AppState();
+}
+
+class _AppState extends State<App> {
+{{UseCaseFields}}
+{{ControllerFields}}
+
+  @override
+  Widget build(BuildContext context) {
+    if ({{UseCaseNullCheck}}) {
+      {{PresenterReads}}
+      {{ServiceCreations}}
+{{UseCaseCreations}}
+      {{ControllerCreations}}
+      WidgetsBinding.instance.addPostFrameCallback((_) => setState(() {}));
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return Scaffold(
+      appBar: AppBar(title: const Text('Use cases')),
+      body: ListView(
+        children: [
+{{ViewTiles}}
+        ],
+      ),
+    );
+  }
+}

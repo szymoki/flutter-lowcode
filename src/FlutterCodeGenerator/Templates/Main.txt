@@ -1,0 +1,19 @@
+// Generated from IR
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+{{PresenterImports}}
+import 'app.dart';
+
+void main() {
+  runApp(
+    MultiProvider(
+      providers: [
+{{Providers}}
+      ],
+      child: MaterialApp(
+        title: 'Generated App',
+        home: const App(),
+      ),
+    ),
+  );
+}

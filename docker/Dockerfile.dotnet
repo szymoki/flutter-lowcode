@@ -1,0 +1,16 @@
+# Kompilator RSL-bis → Flutter (.NET)
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+COPY src/FlutterCodeGenerator.sln .
+COPY src/FlutterCodeGenerator/ ./FlutterCodeGenerator/
+
+RUN dotnet restore && dotnet publish FlutterCodeGenerator/FlutterCodeGenerator.csproj -c Release -o /app
+
+FROM mcr.microsoft.com/dotnet/runtime:8.0
+WORKDIR /app
+COPY --from=build /app .
+
+# Argumenty: <folder_z_plikami_.txt> <folder_wyjściowy>
+# W compose: command: ["/input", "/output"]
+ENTRYPOINT ["dotnet", "FlutterCodeGenerator.dll"]

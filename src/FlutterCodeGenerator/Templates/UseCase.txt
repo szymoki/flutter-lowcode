@@ -1,0 +1,12 @@
+// Generated from IR
+{{PresenterImports}}
+{{ServiceImports}}
+
+class {{ClassName}}UseCase {
+{{PresenterFields}}
+{{ServiceFields}}
+
+  {{ClassName}}UseCase({{ConstructorParams}}) {{InitializerList}}
+
+{{OperationMethods}}
+}

@@ -1,0 +1,10 @@
+// Generated from IR
+class {{ClassName}} {
+{{Fields}}
+
+{{Constructor}}
+
+  {{ClassName}} copyWith({{CopyParams}}) {
+    return {{ClassName}}({{CopyAssignInline}});
+  }
+}

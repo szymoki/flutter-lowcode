@@ -1,0 +1,5 @@
+// Generated from IR
+{{ModelImports}}
+abstract class {{InterfaceName}} {
+{{Methods}}
+}

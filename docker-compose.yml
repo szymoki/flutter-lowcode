@@ -1,0 +1,20 @@
+services:
+  # Kompilator RSL-bis → Flutter (parser .txt → IR → kod Dart)
+  generator:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dotnet
+    volumes:
+      - ./examples:/input
+      - ./flutter_web:/output
+    command: ["/input", "/output"]
+    profiles:
+      - tools
+
+  # Aplikacja Flutter Web (build z flutter_web/ + nginx)
+  flutter_web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.flutter
+    ports:
+      - "8787:80"
