@@ -5,70 +5,87 @@ Kompilator w .NET: parsuje pliki **RSL-bis** (język niskokodowy), buduje reprez
 ## Struktura projektu
 
 ```
-magistrka/
-├── src/FlutterCodeGenerator/         # Kompilator .NET
-│   ├── Parser/
-│   │   ├── Grammar/RslBis.g4         # Gramatyka ANTLR4
-│   │   ├── Generated/               # Wygenerowany parser (RslBisLexer, RslBisParser, …)
-│   │   └── RslBisAstBuilder.cs      # Visitor budujący model RSL z AST
-│   ├── Model/
-│   │   ├── Ir/                      # Reprezentacja pośrednia (IR)
-│   │   └── Rsl/                     # Model domenowy RSL-bis
-│   ├── Translation/
-│   │   └── RslToIrTranslator.cs     # Translacja RSL-bis → IR (12 reguł)
-│   ├── Generator/
-│   │   └── FlutterCodeGenerator.cs  # Generacja kodu Dart z IR
-│   ├── Program.cs                    # parsuj → tłumacz → generuj
-│   └── FlutterCodeGenerator.csproj
-├── flutter_web/                      # Wygenerowana aplikacja Flutter
-├── examples/                         # Przykładowe pliki .txt (RSL-bis) – opcjonalnie
+flutter-lowcode/
+├── src/
+│   ├── FlutterCodeGenerator.sln      # solucja: generator + testy
+│   └── FlutterCodeGenerator/         # Kompilator .NET
+│       ├── Parser/
+│       │   ├── Grammar/RslBis.g4     # Gramatyka ANTLR4 (jedyna kopia)
+│       │   ├── Generated/            # Wygenerowany parser (RslBisLexer, RslBisParser, …)
+│       │   ├── RslBisAstBuilder.cs   # Visitor budujący model RSL z AST
+│       │   └── SyntaxErrorCollector.cs
+│       ├── Model/
+│       │   ├── Rsl/                  # Model domenowy RSL-bis
+│       │   └── Ir/                   # Reprezentacja pośrednia (IR)
+│       ├── Translation/              # Translacja RSL-bis → IR
+│       ├── Generator/                # Generacja kodu Dart z IR
+│       ├── Templates/                # Szablony plików Dart (zasoby osadzone)
+│       ├── Pipeline.cs               # parsuj → tłumacz → generuj
+│       └── Program.cs                # punkt wejścia, kody wyjścia
+├── tests/
+│   ├── FlutterCodeGenerator.Tests/   # testy xUnit (IR i wygenerowany kod)
+│   ├── golden/example/               # wzorzec wyniku dla examples/
+│   └── specs/                        # małe specyfikacje testowe
+├── examples/                         # wejście: pliki .txt (RSL-bis)
+├── flutter_web/                      # wygenerowana aplikacja Flutter
+├── screenshots/                      # zrzuty ekranu wygenerowanej aplikacji
 ├── docker/
-├── docker-compose.yml
-├── rslbis-flutter-compiler.md       # Szczegółowe instrukcje kompilatora
-└── README.md
+└── docker-compose.yml
 ```
 
-## Regeneracja parsera ANTLR4 (opcjonalnie)
-
-Jeśli zmieniasz gramatykę `Parser/Grammar/RslBis.g4`:
-
-```bash
-cd src/FlutterCodeGenerator/Parser/Grammar
-# Pobierz antlr-4.13.1-complete.jar (jeśli brak)
-# java -jar antlr-4.13.1-complete.jar -Dlanguage=CSharp -visitor -no-listener RslBis.g4 -o ../Generated/
-```
-
-## Uruchomienie lokalne (bez Docker)
+## Uruchomienie lokalne (bez Dockera)
 
 ### Wymagania
 
 - .NET 8 SDK
-- Flutter SDK (dla budowania aplikacji web)
+- Flutter SDK (do budowania aplikacji web)
 - (Opcjonalnie) Java – tylko do regeneracji parsera z pliku .g4
 
 ### Kompilator .NET
 
-```bash
-cd src
-dotnet run --project FlutterCodeGenerator
-# Domyślnie: szuka plików .txt w examples/, zapisuje wynik do flutter_web/
+Z katalogu głównego repozytorium:
 
-# Jawne katalogi:
-dotnet run --project FlutterCodeGenerator -- <folder_z_plikami_.txt> <folder_wyjściowy>
+```bash
+dotnet run --project src/FlutterCodeGenerator -- <folder_z_plikami_.txt> <folder_wyjściowy>
 
 # Przykład:
-dotnet run --project FlutterCodeGenerator -- ./examples ./flutter_web
+dotnet run --project src/FlutterCodeGenerator -- examples flutter_web
 ```
 
-Jeśli w folderze wejściowym nie ma plików `.txt`, generator tworzy minimalny szkielet aplikacji Flutter w folderze wyjściowym.
+Oba argumenty są wymagane. Generator wczytuje wszystkie pliki `.txt` z folderu wejściowego (rekurencyjnie, w kolejności nazw) i zapisuje projekt Flutter do folderu wyjściowego.
+
+Kody wyjścia:
+
+| Kod | Znaczenie |
+|---|---|
+| 0 | sukces (ostrzeżenia wypisywane są na stderr) |
+| 1 | błędy specyfikacji: składniowe (z plikiem, wierszem i kolumną), semantyczne albo brak plików `.txt`; nic nie jest zapisywane |
+| 2 | złe użycie (brak argumentów) |
+
+Przy ponownej generacji generator usuwa poprzednią zawartość `lib/models`, `lib/views`, `lib/controllers`, `lib/presenters`, `lib/use_cases` i interfejsy `lib/services/i_*.dart`. Zaślepki usług (`lib/services/*_service_proxy.dart`) są nadpisywane tylko dopóki zaczynają się od linii `// WYGENEROWANO: …`. Po uzupełnieniu implementacji usuń tę linię, a generator przestanie nadpisywać plik.
+
+### Testy
+
+```bash
+dotnet test src
+```
+
+Test „golden” porównuje wynik generacji dla `examples/` z `tests/golden/example/`. Po zamierzonej zmianie generatora zaktualizuj wzorzec:
+
+```bash
+UPDATE_GOLDEN=1 dotnet test src
+```
 
 ### Aplikacja Flutter Web
 
 ```bash
 cd flutter_web
+flutter create . --platforms web   # jednorazowo, tworzy web/
 flutter pub get
-flutter run -d chrome   # lub: flutter run -d web-server --web-port=8080
+flutter run -d chrome              # lub: flutter run -d web-server --web-port=8080
 ```
+
+Aplikacja startuje od przypadku użycia `Start`. Lista wszystkich widoków jest dostępna jako tryb diagnostyczny: `App(viewListMode: true)` w `lib/main.dart`.
 
 ## Uruchomienie w Dockerze (Linux)
 
@@ -94,6 +111,19 @@ Jedną komendą (generator + build + uruchomienie):
 docker compose run --rm generator && docker compose up --build flutter_web
 ```
 
+## Regeneracja parsera ANTLR4 (opcjonalnie)
+
+Jeśli zmieniasz gramatykę `src/FlutterCodeGenerator/Parser/Grammar/RslBis.g4`:
+
+```bash
+cd src/FlutterCodeGenerator/Parser/Grammar
+java -jar antlr-4.13.1-complete.jar -Dlanguage=CSharp -visitor -no-listener RslBis.g4 -o ../Generated/
+```
+
 ## Rozszerzanie generatora
 
-Logika generowania kodu Fluttera jest w `src/FlutterCodeGenerator/Generator/FlutterCodeGenerator.cs`. Można dodać nowe metody generujące kolejne typy plików i wywołać je z `Generate()`.
+- Translacja RSL-bis → IR: `src/FlutterCodeGenerator/Translation/RslToIrTranslator.cs`.
+- Generacja kodu Dart: `src/FlutterCodeGenerator/Generator/FlutterCodeGenerator.cs` (pliki) i `Generator/UseCaseWriter.cs` (ciała metod przypadków użycia).
+- Wygląd generowanego kodu: szablony w `src/FlutterCodeGenerator/Templates/` (znaczniki `{{…}}`).
+
+Decyzje projektowe podjęte przy poprawkach translatora opisuje sekcja „Decyzje” w `PLAN_POPRAWEK.md`.
