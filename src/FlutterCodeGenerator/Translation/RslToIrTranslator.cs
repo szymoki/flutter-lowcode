@@ -48,7 +48,7 @@ public class RslToIrTranslator
     {
         if (instr is Call c)
         {
-            var clone = new Call { Label = c.Label, OperationRef = c.OperationRef };
+            var clone = new Call { Label = c.Label, OperationRef = c.OperationRef, TargetUseCase = c.TargetUseCase, TargetOperation = c.TargetOperation };
             clone.Parameters.AddRange(c.Parameters.Select(p => new Parameter { Label = p.Label, IsAttribute = p.IsAttribute, Type = p.Type }));
             return clone;
         }
@@ -88,6 +88,16 @@ public class RslToIrTranslator
         }
 
         var ctx = new TranslationContext();
+        // Pierwszy przebieg: klasy i operacje wejściowe wszystkich przypadków użycia, żeby <invoke>
+        // mógł wskazać przypadek użycia zapisany dalej w pliku.
+        foreach (var uc in useCases)
+            CreateUseCaseClass(uc, ir, ctx);
+        if (ctx.Errors.Count > 0)
+        {
+            Errors.AddRange(ctx.Errors);
+            return ir;
+        }
+
         foreach (var uc in useCases)
         {
             ProcessUseCaseClause(uc, ir, ctx);
@@ -122,26 +132,47 @@ public class RslToIrTranslator
         }
     }
 
-    private void ProcessUseCaseClause(UseCase uc, IrModel ir, TranslationContext ctx)
+    private void CreateUseCaseClass(UseCase uc, IrModel ir, TranslationContext ctx)
     {
         var ucc = new UseCaseClass
         {
             Label = ToPascalCase(uc.Name),
             IsInitial = string.Equals(uc.Name.Trim(), "Start", StringComparison.OrdinalIgnoreCase)
         };
+        if (!ctx.UseCaseByName.TryAdd(uc.Name.Trim(), ucc))
+        {
+            ctx.Errors.Add($"Przypadek użycia „{uc.Name}” zdefiniowano więcej niż raz.");
+            return;
+        }
         ir.UseCases.Add(ucc);
+
+        var initOp = new UCOperation { Label = "execute", IsInitial = true };
+        ucc.Operations.Add(initOp);
+        ucc.EntryOperation = initOp;
+
+        var first = uc.MainScenario.AltSentences.FirstOrDefault();
+        if (first is SvoSentence { Step: UserStep { Predicate: SelectPredicate sel } })
+        {
+            var entry = new UCOperation { Label = "handle" + ToPascalCase(sel.Notion), IsInitial = true, TriggerNotion = sel.Notion };
+            ucc.Operations.Add(entry);
+            ucc.EntryOperation = entry;
+            ucc.EntryTriggerNotion = sel.Notion;
+        }
+    }
+
+    private void ProcessUseCaseClause(UseCase uc, IrModel ir, TranslationContext ctx)
+    {
+        var ucc = ctx.UseCaseByName[uc.Name.Trim()];
         ctx.CurrentUCC = ucc;
         ctx.CurrentUseCaseName = uc.Name;
+        ctx.FirstSentence = uc.MainScenario.AltSentences.FirstOrDefault();
         ctx.ContextDA.Clear();
         ctx.LabelSnapshots.Clear();
         ctx.CurrentVF = null;
         ctx.CurrentCondition = null;
         ctx.CurrentDAP.Clear();
         ctx.CurrentDAD.Clear();
-
-        var initOp = new UCOperation { Label = "execute", IsInitial = true };
-        ucc.Operations.Add(initOp);
-        ctx.CurrentUCO = initOp;
+        ctx.CurrentUCO = ucc.Operations[0];
 
         if (uc.MainScenario.Preconditions.Count > 0)
             ProcessPrecondition(uc.MainScenario.Preconditions, ir, ctx);
@@ -239,14 +270,16 @@ public class RslToIrTranslator
         if (svo.Step is UserStep user)
         {
             if (user.Predicate is SelectPredicate sel)
-                ProcessSelectSentence(user.Actor, sel.Notion, ctx.CurrentUCO?.IsInitial ?? false, ir, ctx);
+            {
+                if (ReferenceEquals(svo, ctx.FirstSentence))
+                    ProcessFirstSelectSentence(ctx);
+                else
+                    ProcessSelectSentence(user.Actor, sel.Notion, ir, ctx);
+            }
             else if (user.Predicate is EnterPredicate ent)
                 ProcessEnterSentence(ent.Notion, ir, ctx);
             else if (user.Predicate is InvokePredicate inv)
-            {
-                foreach (var name in inv.Names)
-                    ctx.ScheduledInvocations.Add((ToPascalCase(name), () => { }));
-            }
+                ProcessActorInvokeSentence(inv.Names, ctx);
         }
         else if (svo.Step is SystemStep sys)
         {
@@ -264,6 +297,8 @@ public class RslToIrTranslator
                 ProcessSystemDataSentence(PredicateType.Check, ch.Notion, ir, ctx);
             else if (sys.Predicate is ExecutePredicate e)
                 ProcessSystemDataSentence(PredicateType.Execute, e.Notion, ir, ctx);
+            else if (sys.Predicate is SysInvokePredicate si)
+                ProcessSystemInvokeSentence(si.Name, ctx);
         }
     }
 
@@ -318,14 +353,64 @@ public class RslToIrTranslator
             ctx.CurrentVF.Data.Add(da);
     }
 
-    private void ProcessSelectSentence(string actor, string notion, bool isInitial, IrModel ir, TranslationContext ctx)
+    /// <summary>
+    /// Pierwsze zdanie &lt;select&gt; przypadku użycia uruchamia go z zewnątrz, więc nie ma jeszcze
+    /// widoku tego przypadku użycia. Przycisk dodaje &lt;invoke&gt; w przypadku wywołującym.
+    /// </summary>
+    private static void ProcessFirstSelectSentence(TranslationContext ctx)
+    {
+        ctx.CurrentUCO = ctx.CurrentUCC!.EntryOperation;
+        ctx.CurrentCondition = null;
+    }
+
+    private void ProcessActorInvokeSentence(List<string> names, TranslationContext ctx)
+    {
+        foreach (var name in names)
+        {
+            if (!ctx.UseCaseByName.TryGetValue(name.Trim(), out var invoked))
+            {
+                ctx.Errors.Add($"Przypadek użycia „{ctx.CurrentUseCaseName}”: <invoke> wskazuje nieznany przypadek użycia „{name}”.");
+                continue;
+            }
+            if (ctx.CurrentUCC != null && !ctx.CurrentUCC.InvokedUseCases.Contains(invoked))
+                ctx.CurrentUCC.InvokedUseCases.Add(invoked);
+            if (ctx.CurrentVF == null)
+            {
+                ctx.Warnings.Add($"Przypadek użycia „{ctx.CurrentUseCaseName}”: <invoke> {name} przed pierwszym <show> – brak widoku na przycisk.");
+                continue;
+            }
+            if (invoked.EntryTriggerNotion == null)
+                ctx.Warnings.Add($"Przypadek użycia „{name}” jest wywoływany przez <invoke>, ale nie zaczyna się od <select>; " +
+                                 "przycisk uruchamia operację execute i ma nazwę przypadku użycia (D5.2).");
+            AddTrigger(ctx.CurrentVF, invoked.EntryTriggerNotion ?? name, invoked.EntryOperation!, invoked, ctx);
+        }
+    }
+
+    private void ProcessSystemInvokeSentence(string name, TranslationContext ctx)
+    {
+        if (!ctx.UseCaseByName.TryGetValue(name.Trim(), out var invoked))
+        {
+            ctx.Errors.Add($"Przypadek użycia „{ctx.CurrentUseCaseName}”: <invoke> wskazuje nieznany przypadek użycia „{name}”.");
+            return;
+        }
+        if (ctx.CurrentUCC != null && !ctx.CurrentUCC.InvokedUseCases.Contains(invoked))
+            ctx.CurrentUCC.InvokedUseCases.Add(invoked);
+        AddInstruction(new Call
+        {
+            Label = ctx.CurrentLabel,
+            OperationRef = invoked.EntryOperation!.Label,
+            TargetUseCase = invoked,
+            TargetOperation = invoked.EntryOperation
+        }, ctx);
+    }
+
+    private void ProcessSelectSentence(string actor, string notion, IrModel ir, TranslationContext ctx)
     {
         // Operacja należy do przypadku użycia, w którego scenariuszu stoi zdanie (D3.1),
         // a przycisk – do widoku wyświetlonego jako ostatni.
         var ucOp = new UCOperation
         {
             Label = "handle" + ToPascalCase(notion),
-            IsInitial = isInitial,
             SourceView = ctx.CurrentVF,
             TriggerNotion = notion
         };
@@ -336,9 +421,6 @@ public class RslToIrTranslator
 
         if (ctx.CurrentVF != null)
             AddTrigger(ctx.CurrentVF, notion, ucOp, ctx.CurrentUCC, ctx);
-
-        if (isInitial)
-            ProcessScheduledInvocations(ir, ctx);
     }
 
     /// <summary>Dodaje do widoku wyzwalacz i operację kontrolera wskazującą operację przypadku użycia.</summary>
@@ -426,12 +508,5 @@ public class RslToIrTranslator
         var toCopy = target.InstructionList.Skip(target.InstructionIndex).ToList();
         foreach (var instr in toCopy)
             AddInstruction(CloneInstruction(instr), ctx);
-    }
-
-    private void ProcessScheduledInvocations(IrModel ir, TranslationContext ctx)
-    {
-        foreach (var (ucName, attach) in ctx.ScheduledInvocations)
-            attach();
-        ctx.ScheduledInvocations.Clear();
     }
 }

@@ -85,11 +85,11 @@ class _AppState extends State<App> {
       _showOrderListUseCase = ShowOrderListUseCase(pOrderListWindow: pOrderListWindow, orderList: orderList);
       _addOrderUseCase = AddOrderUseCase(pAddOrderForm: pAddOrderForm, pOrderSuccessMessage: pOrderSuccessMessage, pOrderErrorMessage: pOrderErrorMessage, order: order);
       _deleteOrderUseCase = DeleteOrderUseCase(pDeleteConfirmationMessage: pDeleteConfirmationMessage, pOrderDeletedMessage: pOrderDeletedMessage, order: order);
-            _cMainMenu = CMainMenu();
+            _cMainMenu = CMainMenu(showOrderListUseCase: _showOrderListUseCase!, findOrderUseCase: _findOrderUseCase!, addOrderUseCase: _addOrderUseCase!);
       _cOrderSearchForm = COrderSearchForm(findOrderUseCase: _findOrderUseCase!);
       _cOrderWindow = COrderWindow(findOrderUseCase: _findOrderUseCase!);
       _cSearchErrorMessage = CSearchErrorMessage(findOrderUseCase: _findOrderUseCase!);
-      _cOrderListWindow = COrderListWindow(showOrderListUseCase: _showOrderListUseCase!);
+      _cOrderListWindow = COrderListWindow(showOrderListUseCase: _showOrderListUseCase!, findOrderUseCase: _findOrderUseCase!, addOrderUseCase: _addOrderUseCase!, deleteOrderUseCase: _deleteOrderUseCase!);
       _cAddOrderForm = CAddOrderForm(addOrderUseCase: _addOrderUseCase!);
       _cOrderSuccessMessage = COrderSuccessMessage(addOrderUseCase: _addOrderUseCase!);
       _cOrderErrorMessage = COrderErrorMessage(addOrderUseCase: _addOrderUseCase!);

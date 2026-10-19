@@ -42,7 +42,9 @@ class _MainMenuViewState extends State<MainMenuView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-
+                ElevatedButton(onPressed: () => widget.controller.onShowOrderList(), child: const Text('showOrderList')),
+                ElevatedButton(onPressed: () => widget.controller.onFindOrder(), child: const Text('findOrder')),
+                ElevatedButton(onPressed: () => widget.controller.onAddOrder(), child: const Text('addOrder')),
               ],
             ),
           ),

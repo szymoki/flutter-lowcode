@@ -1,4 +1,5 @@
 using FlutterCodeGenerator.Model.Ir;
+using FlutterCodeGenerator.Model.Rsl;
 
 namespace FlutterCodeGenerator.Translation;
 
@@ -17,7 +18,10 @@ public class TranslationContext
     /// <summary>Migawki stanu po zdaniach z etykietą; etykiety są lokalne dla przypadku użycia.</summary>
     public Dictionary<string, LabelSnapshot> LabelSnapshots { get; } = new();
     public string CurrentUseCaseName { get; set; } = "";
-    public List<(string UcName, Action Attach)> ScheduledInvocations { get; } = new();
+    /// <summary>Klasy przypadków użycia według nazwy RSL, utworzone przed translacją scenariuszy.</summary>
+    public Dictionary<string, UseCaseClass> UseCaseByName { get; } = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Pierwsze zdanie scenariusza głównego bieżącego przypadku użycia.</summary>
+    public Sentence? FirstSentence { get; set; }
     public List<string> Warnings { get; } = new();
     public List<string> Errors { get; } = new();
 }

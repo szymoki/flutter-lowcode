@@ -8,6 +8,14 @@ public class UseCaseClass
     public List<PresenterClass> Presenters { get; } = new();
     public List<ServiceInterface> Services { get; } = new();
     public List<UseCaseClass> InvokedUseCases { get; } = new();
+
+    /// <summary>
+    /// Operacja uruchamiająca przypadek użycia z zewnątrz: operacja pierwszego zdania <c>&lt;select&gt;</c>,
+    /// a gdy przypadek użycia nie zaczyna się od <c>&lt;select&gt;</c> – <c>execute</c>.
+    /// </summary>
+    public UCOperation? EntryOperation { get; set; }
+    /// <summary>Pojęcie pierwszego zdania <c>&lt;select&gt;</c> (nazwa przycisku uruchamiającego), jeśli istnieje.</summary>
+    public string? EntryTriggerNotion { get; set; }
 }
 
 public class UCOperation

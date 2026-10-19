@@ -44,6 +44,9 @@ class _OrderListWindowViewState extends State<OrderListWindowView> {
               children: [
                 ElevatedButton(onPressed: () => widget.controller.onClose(), child: const Text('close')),
                 ElevatedButton(onPressed: () => widget.controller.onOrderList(), child: const Text('orderList')),
+                ElevatedButton(onPressed: () => widget.controller.onFindOrder(), child: const Text('findOrder')),
+                ElevatedButton(onPressed: () => widget.controller.onAddOrder(), child: const Text('addOrder')),
+                ElevatedButton(onPressed: () => widget.controller.onDeleteOrder(), child: const Text('deleteOrder')),
               ],
             ),
           ),
