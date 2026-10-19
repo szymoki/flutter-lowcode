@@ -18,14 +18,6 @@ class _OrderSearchFormViewState extends State<OrderSearchFormView> {
   final _orderSearchTitleController = TextEditingController();
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<POrderSearchForm>().show();
-    });
-  }
-
-  @override
   void dispose() {
     _orderSearchTitleController.dispose();
     super.dispose();

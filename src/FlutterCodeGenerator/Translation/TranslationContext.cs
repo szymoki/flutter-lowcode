@@ -16,6 +16,8 @@ public class TranslationContext
     public string CurrentLabel { get; set; } = "";
     public UCOperation? CurrentUCO { get; set; }
     public Condition? CurrentCondition { get; set; }
+    /// <summary>Po &lt;invoke&gt; instrukcje trafiają do kontynuacji tej operacji zamiast do jej ciała.</summary>
+    public UCOperation? ResumeOperation { get; set; }
     public Dictionary<string, ViewWidget> LabelToVF { get; } = new();
     /// <summary>Migawki stanu po zdaniach z etykietą; etykiety są lokalne dla przypadku użycia.</summary>
     public Dictionary<string, LabelSnapshot> LabelSnapshots { get; } = new();

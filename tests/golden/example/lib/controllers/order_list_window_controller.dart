@@ -14,7 +14,7 @@ class COrderListWindow {
 
   void onClose() { _showOrderListUseCase.handleClose(); }
   void onOrderList() { _showOrderListUseCase.handleOrderList(); }
-  void onFindOrder() { _findOrderUseCase.handleFindOrder(); }
-  void onAddOrder() { _addOrderUseCase.handleAddOrder(); }
-  void onDeleteOrder() { _deleteOrderUseCase.handleDeleteOrder(); }
+  void onFindOrder() { _findOrderUseCase.setOnEnd(_showOrderListUseCase.resumeHandleOrderList); _findOrderUseCase.handleFindOrder(); }
+  void onAddOrder() { _addOrderUseCase.setOnEnd(_showOrderListUseCase.resumeHandleOrderList); _addOrderUseCase.handleAddOrder(); }
+  void onDeleteOrder() { _deleteOrderUseCase.setOnEnd(_showOrderListUseCase.resumeHandleOrderList); _deleteOrderUseCase.handleDeleteOrder(); }
 }

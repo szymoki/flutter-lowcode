@@ -40,8 +40,10 @@ public class RslToIrTranslator
     {
         if (ctx.CurrentCondition != null)
             ctx.CurrentCondition.Instructions.Add(instr);
-        else if (ctx.CurrentUCO?.Instructions != null)
-            ctx.CurrentUCO.Instructions.Add(instr);
+        else if (ctx.ResumeOperation != null)
+            ctx.ResumeOperation.ResumeInstructions.Add(instr);
+        else
+            ctx.CurrentUCO?.Instructions.Add(instr);
     }
 
     private static Instruction CloneInstruction(Instruction instr)
@@ -51,7 +53,8 @@ public class RslToIrTranslator
             var clone = new Call
             {
                 Label = c.Label, OperationRef = c.OperationRef, TargetUseCase = c.TargetUseCase, TargetOperation = c.TargetOperation,
-                Presenter = c.Presenter, Service = c.Service, ServiceOperation = c.ServiceOperation
+                Presenter = c.Presenter, Service = c.Service, ServiceOperation = c.ServiceOperation,
+                ResumeOperation = c.ResumeOperation
             };
             clone.Parameters.AddRange(c.Parameters.Select(p => new Parameter { Label = p.Label, IsAttribute = p.IsAttribute, Type = p.Type }));
             return clone;
@@ -244,6 +247,7 @@ public class RslToIrTranslator
         ctx.LabelSnapshots.Clear();
         ctx.CurrentVF = null;
         ctx.CurrentCondition = null;
+        ctx.ResumeOperation = null;
         ctx.CurrentDAP.Clear();
         ctx.CurrentDAD.Clear();
         ctx.PendingEditable.Clear();
@@ -300,6 +304,7 @@ public class RslToIrTranslator
         ctx.CurrentVF = snapshot.CurrentVF;
         ctx.CurrentUCO = snapshot.CurrentUCO;
         ctx.CurrentCondition = snapshot.CurrentCondition;
+        ctx.ResumeOperation = snapshot.ResumeOperation;
         ctx.CurrentDAP.Clear();
         ctx.CurrentDAP.AddRange(snapshot.CurrentDAP);
         ctx.CurrentDAD.Clear();
@@ -325,6 +330,7 @@ public class RslToIrTranslator
                     CurrentVF = ctx.CurrentVF,
                     CurrentUCO = ctx.CurrentUCO,
                     CurrentCondition = ctx.CurrentCondition,
+                    ResumeOperation = ctx.ResumeOperation,
                     CurrentDAP = ctx.CurrentDAP.ToList(),
                     CurrentDAD = ctx.CurrentDAD.ToList(),
                     InstructionList = positionList,
@@ -346,7 +352,7 @@ public class RslToIrTranslator
     }
 
     private static List<Instruction>? CurrentInstructionList(TranslationContext ctx) =>
-        ctx.CurrentCondition?.Instructions ?? ctx.CurrentUCO?.Instructions;
+        ctx.CurrentCondition?.Instructions ?? ctx.ResumeOperation?.ResumeInstructions ?? ctx.CurrentUCO?.Instructions;
 
     private void ProcessSvoSentence(SvoSentence svo, IrModel ir, TranslationContext ctx)
     {
@@ -449,6 +455,7 @@ public class RslToIrTranslator
     {
         ctx.CurrentUCO = ctx.CurrentUCC!.EntryOperation;
         ctx.CurrentCondition = null;
+        ctx.ResumeOperation = null;
     }
 
     private void ProcessActorInvokeSentence(List<string> names, TranslationContext ctx)
@@ -470,8 +477,18 @@ public class RslToIrTranslator
             if (invoked.EntryTriggerNotion == null)
                 ctx.Warnings.Add($"Przypadek użycia „{name}” jest wywoływany przez <invoke>, ale nie zaczyna się od <select>; " +
                                  "przycisk uruchamia operację execute i ma nazwę przypadku użycia (D5.2).");
-            AddTrigger(ctx.CurrentVF, invoked.EntryTriggerNotion ?? name, invoked.EntryOperation!, invoked, ctx);
+            AddTrigger(ctx.CurrentVF, invoked.EntryTriggerNotion ?? name, invoked.EntryOperation!, invoked, ctx,
+                       returnOperation: ctx.CurrentUCO, returnUseCase: ctx.CurrentUCC);
+            StartResume(ctx);
         }
+    }
+
+    /// <summary>Dalsze zdania scenariusza wykonają się po powrocie z wywołanego przypadku użycia (D9.2).</summary>
+    private static void StartResume(TranslationContext ctx)
+    {
+        if (ctx.CurrentUCO == null) return;
+        ctx.CurrentUCO.IsInvoking = true;
+        ctx.ResumeOperation = ctx.CurrentUCO;
     }
 
     private void ProcessSystemInvokeSentence(string name, TranslationContext ctx)
@@ -488,8 +505,10 @@ public class RslToIrTranslator
             Label = ctx.CurrentLabel,
             OperationRef = invoked.EntryOperation!.Label,
             TargetUseCase = invoked,
-            TargetOperation = invoked.EntryOperation
+            TargetOperation = invoked.EntryOperation,
+            ResumeOperation = ctx.CurrentUCO
         }, ctx);
+        StartResume(ctx);
     }
 
     private void ProcessSelectSentence(string actor, string notion, IrModel ir, TranslationContext ctx)
@@ -506,15 +525,17 @@ public class RslToIrTranslator
             ucOp.InputData.AddRange(ctx.CurrentVF.EditableData);
         ctx.CurrentUCC?.Operations.Add(ucOp);
         ctx.CurrentUCO = ucOp;
-        // Nowa operacja zaczyna się poza gałęzią decyzji poprzedniej operacji.
+        // Nowa operacja zaczyna się poza gałęzią decyzji i kontynuacją poprzedniej operacji.
         ctx.CurrentCondition = null;
+        ctx.ResumeOperation = null;
 
         if (ctx.CurrentVF != null)
             AddTrigger(ctx.CurrentVF, notion, ucOp, ctx.CurrentUCC, ctx);
     }
 
     /// <summary>Dodaje do widoku wyzwalacz i operację kontrolera wskazującą operację przypadku użycia.</summary>
-    private static void AddTrigger(ViewWidget view, string notion, UCOperation target, UseCaseClass? targetUseCase, TranslationContext ctx)
+    private static void AddTrigger(ViewWidget view, string notion, UCOperation target, UseCaseClass? targetUseCase, TranslationContext ctx,
+                                   UCOperation? returnOperation = null, UseCaseClass? returnUseCase = null)
     {
         var triggerLabel = ToCamelCase(notion);
         if (!view.Triggers.Any(t => t.Label == triggerLabel))
@@ -524,7 +545,11 @@ public class RslToIrTranslator
         var copLabel = "on" + ToPascalCase(notion);
         var existing = ctrl.Operations.FirstOrDefault(o => o.Label == copLabel);
         if (existing == null)
-            ctrl.Operations.Add(new COperation { Label = copLabel, Target = target, TargetUseCase = targetUseCase });
+            ctrl.Operations.Add(new COperation
+            {
+                Label = copLabel, Target = target, TargetUseCase = targetUseCase,
+                ReturnOperation = returnOperation, ReturnUseCase = returnUseCase
+            });
         else if (existing.Target != target)
             ctx.Warnings.Add($"Wyzwalacz „{notion}” w widoku {view.Label} wskazuje już operację {existing.TargetUseCase?.Label}.{existing.Target?.Label}; " +
                              $"pominięto drugie przypisanie do {targetUseCase?.Label}.{target.Label}.");
@@ -589,6 +614,7 @@ public class RslToIrTranslator
         if (end.IsRejoin && !string.IsNullOrEmpty(end.RejoinLabel))
             ProcessRejoinSentence(end.RejoinLabel, ctx);
         ctx.CurrentCondition = null;
+        ctx.ResumeOperation = null;
     }
 
     private void ProcessRejoinSentence(string label, TranslationContext ctx)

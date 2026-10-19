@@ -1,22 +1,13 @@
 // Generated from IR
-import 'package:flutter/foundation.dart';
 import '../models/order.dart';
+import 'view_presenter.dart';
 
-
-class POrderWindow extends ChangeNotifier {
-  bool _isVisible = false;
-  bool get isVisible => _isVisible;
+class POrderWindow extends ViewPresenter {
   Order? _order;
   Order? get order => _order;
 
   void showOrderWindow({Order? order}) {
         if (order != null) _order = order;
-    _isVisible = true;
-    notifyListeners();
+    show();
   }
-
-
-  void show() { _isVisible = true; notifyListeners(); }
-  void hide() { _isVisible = false; notifyListeners(); }
-  void clear() { _isVisible = false; notifyListeners(); }
 }

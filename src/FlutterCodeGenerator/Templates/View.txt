@@ -17,14 +17,6 @@ class _{{ViewName}}ViewState extends State<{{ViewName}}View> {
 {{Fields}}
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<{{PresenterName}}>().show();
-    });
-  }
-
-  @override
   void dispose() {
 {{DisposeCalls}}
     super.dispose();

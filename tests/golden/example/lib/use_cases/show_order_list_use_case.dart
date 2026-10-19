@@ -7,9 +7,14 @@ class ShowOrderListUseCase {
   final POrderListWindow _pOrderListWindow;
   final IOrderList _orderList;
   OrderList? _currentOrderList;
+  void Function(String result)? _onEnd;
 
   ShowOrderListUseCase({ required POrderListWindow pOrderListWindow, required IOrderList orderList }) : _pOrderListWindow = pOrderListWindow,
       _orderList = orderList;
+
+  void setOnEnd(void Function(String result) onEnd) {
+    _onEnd = onEnd;
+  }
 
   void execute() {}
 
@@ -23,7 +28,9 @@ class ShowOrderListUseCase {
     _end('OK');
   }
 
-  Future<void> handleOrderList() async {
+  void handleOrderList() {}
+
+  Future<void> resumeHandleOrderList(String result) async {
     _currentOrderList = await _orderList.readOrderList();
     _hideViews();
     _pOrderListWindow.showOrderListWindow(orderList: _currentOrderList);
@@ -35,5 +42,8 @@ class ShowOrderListUseCase {
 
   void _end(String result) {
     _hideViews();
+    final onEnd = _onEnd;
+    _onEnd = null;
+    onEnd?.call(result);
   }
 }

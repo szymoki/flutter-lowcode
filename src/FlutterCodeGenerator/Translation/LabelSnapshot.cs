@@ -13,6 +13,7 @@ public class LabelSnapshot
     public ViewWidget? CurrentVF { get; init; }
     public UCOperation? CurrentUCO { get; init; }
     public Condition? CurrentCondition { get; init; }
+    public UCOperation? ResumeOperation { get; init; }
     public List<DataAggregate> CurrentDAP { get; init; } = new();
     public List<DataAggregate> CurrentDAD { get; init; } = new();
 

@@ -1,0 +1,22 @@
+Use case Start Main scenario
+00: User <select> application
+01: System <show> main menu
+02: User <select> refresh
+03: System <invoke> Show list
+04: System <show> main menu
+-> end ! OK
+
+Use case Show list Main scenario
+00: User <select> show list
+01: System <read> item list
+02: System <show> list window
+03: User <select> close
+-> end ! OK
+
+Data item {
+    name : text
+}
+
+Data item list {
+    items : [item]
+}

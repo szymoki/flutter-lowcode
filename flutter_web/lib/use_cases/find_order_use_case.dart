@@ -17,12 +17,17 @@ class FindOrderUseCase {
   Order? _currentOrder;
   OrderSearch? _currentOrderSearch;
   OrderSearchCheckResult? _orderSearchCheckResult;
+  void Function(String result)? _onEnd;
 
   FindOrderUseCase({ required POrderSearchForm pOrderSearchForm, required POrderWindow pOrderWindow, required PSearchErrorMessage pSearchErrorMessage, required IOrderSearch orderSearch, required IOrder order }) : _pOrderSearchForm = pOrderSearchForm,
       _pOrderWindow = pOrderWindow,
       _pSearchErrorMessage = pSearchErrorMessage,
       _orderSearch = orderSearch,
       _order = order;
+
+  void setOnEnd(void Function(String result) onEnd) {
+    _onEnd = onEnd;
+  }
 
   void execute() {}
 
@@ -64,5 +69,8 @@ class FindOrderUseCase {
 
   void _end(String result) {
     _hideViews();
+    final onEnd = _onEnd;
+    _onEnd = null;
+    onEnd?.call(result);
   }
 }

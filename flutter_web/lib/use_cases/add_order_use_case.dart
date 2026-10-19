@@ -13,11 +13,16 @@ class AddOrderUseCase {
   final IOrder _order;
   Order? _currentOrder;
   OrderCheckResult? _orderCheckResult;
+  void Function(String result)? _onEnd;
 
   AddOrderUseCase({ required PAddOrderForm pAddOrderForm, required POrderSuccessMessage pOrderSuccessMessage, required POrderErrorMessage pOrderErrorMessage, required IOrder order }) : _pAddOrderForm = pAddOrderForm,
       _pOrderSuccessMessage = pOrderSuccessMessage,
       _pOrderErrorMessage = pOrderErrorMessage,
       _order = order;
+
+  void setOnEnd(void Function(String result) onEnd) {
+    _onEnd = onEnd;
+  }
 
   void execute() {}
 
@@ -64,5 +69,8 @@ class AddOrderUseCase {
 
   void _end(String result) {
     _hideViews();
+    final onEnd = _onEnd;
+    _onEnd = null;
+    onEnd?.call(result);
   }
 }

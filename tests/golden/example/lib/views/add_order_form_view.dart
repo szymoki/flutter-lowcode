@@ -20,14 +20,6 @@ class _AddOrderFormViewState extends State<AddOrderFormView> {
   final _orderDatesController = TextEditingController();
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<PAddOrderForm>().show();
-    });
-  }
-
-  @override
   void dispose() {
     _orderNumberController.dispose();
     _orderTitleController.dispose();

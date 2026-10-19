@@ -17,14 +17,6 @@ class _OrderWindowViewState extends State<OrderWindowView> {
 
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<POrderWindow>().show();
-    });
-  }
-
-  @override
   void dispose() {
 
     super.dispose();

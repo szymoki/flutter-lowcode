@@ -24,7 +24,10 @@ public class UCOperation
 {
     public string Label { get; set; } = "";
     public bool IsInitial { get; set; }
+    /// <summary>Operacja wywołuje inny przypadek użycia i po jego zakończeniu wykonuje <see cref="ResumeInstructions"/>.</summary>
     public bool IsInvoking { get; set; }
+    /// <summary>Instrukcje po &lt;invoke&gt;: wykonywane, gdy wywołany przypadek użycia się zakończy.</summary>
+    public List<Instruction> ResumeInstructions { get; } = new();
     public string? ReturnTo { get; set; }
     public UCOperation? Parent { get; set; }
     /// <summary>Widok, którego wyzwalacz uruchamia operację (null dla operacji bez widoku, np. execute).</summary>

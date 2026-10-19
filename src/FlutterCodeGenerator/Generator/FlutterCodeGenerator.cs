@@ -106,6 +106,7 @@ public class FlutterCodeGenerator
         foreach (var e in ir.ViewModel.Enums)
             WriteEnum(e, modelsPath);
 
+        File.WriteAllText(Path.Combine(presentersPath, "view_presenter.dart"), LoadTemplate("ViewPresenter.txt"));
         foreach (var pres in ir.Presenters)
             WritePresenter(pres, presentersPath, ir);
 
@@ -249,13 +250,13 @@ public class FlutterCodeGenerator
                 return $"    if ({name} != null) _{name} = {name};";
             }).ToList();
             var body = assigns.Count > 0 ? string.Join("\n", assigns) + "\n    " : "";
-            return "  void " + g.Key + "(" + pars + ") {\n    " + body + "_isVisible = true;\n    notifyListeners();\n  }\n";
+            return "  void " + g.Key + "(" + pars + ") {\n    " + body + "show();\n  }\n";
         }).ToList();
         var content = FillTemplate(LoadTemplate("Presenter.txt"),
             ("ClassName", pres.Label),
             ("ModelImports", modelImports.Count > 0 ? string.Join("\n", modelImports) + "\n" : ""),
             ("Fields", string.Join("\n", fields)),
-            ("Methods", string.Join("\n", methods)));
+            ("Methods", string.Join("\n", methods).TrimEnd('\n')));
         File.WriteAllText(Path.Combine(presentersPath, ToSnakeCase(pres.Label) + "_presenter.dart"), content);
     }
 
@@ -278,7 +279,7 @@ public class FlutterCodeGenerator
             initParts.Add($"_{ServiceVar(s)} = {ServiceVar(s)}");
         var initializerList = initParts.Count > 0 ? ": " + string.Join(",\n      ", initParts) + ";" : ";";
 
-        var writer = new UseCaseWriter(uc, AggregatesByLabel, Warnings);
+        var writer = new UseCaseWriter(uc, AggregatesByLabel, Warnings, isInvoked: ir.UseCases.Any(u => u.InvokedUseCases.Contains(uc)));
         var modelImports = writer.UsedModelTypes.Select(t => ModelImport(t)).ToList();
 
         var presenterImports = uc.Presenters.Select(p => "import '../presenters/" + ToSnakeCase(p.Label) + "_presenter.dart';").ToList();
@@ -290,13 +291,15 @@ public class FlutterCodeGenerator
             ("ClassName", uc.Label),
             ("ModelImports", modelImports.Count > 0 ? string.Join("\n", modelImports) + "\n" : ""),
             ("PresenterImports", string.Join("\n", presenterImports)),
-            ("ServiceImports", string.Join("\n", serviceImports)),
+            ("ServiceImports", string.Join("\n", serviceImports.Concat(writer.UseCaseImports))),
             ("PresenterFields", presenterFields),
             ("ServiceFields", serviceFields),
             ("DataFields", writer.Fields()),
             ("ConstructorParams", constructorParams),
             ("InitializerList", initializerList),
             ("OperationMethods", writer.Methods()));
+        // Puste sekcje szablonu (brak usług, pól danych) zostawiają kilka pustych wierszy z rzędu.
+        content = System.Text.RegularExpressions.Regex.Replace(content, "\n{3,}", "\n\n");
         File.WriteAllText(Path.Combine(useCasesPath, ToSnakeCase(uc.Label) + "_use_case.dart"), content);
     }
 
@@ -321,7 +324,11 @@ public class FlutterCodeGenerator
             var input = op.Target!.InputData;
             var pars = string.Join(", ", input.Select(d => $"{d.Label} {Naming.LowerFirst(d.Label)}"));
             var args = string.Join(", ", input.Select(d => Naming.LowerFirst(d.Label)));
-            return $"  void {op.Label}({pars}) {{ _{UseCaseVar(op.TargetUseCase!)}.{op.Target.Label}({args}); }}";
+            // Przycisk z <invoke>: po zakończeniu wywołanego przypadku użycia wznawia operację wywołującą.
+            var onEnd = op.ReturnOperation != null && op.ReturnUseCase != null
+                ? $"_{UseCaseVar(op.TargetUseCase!)}.setOnEnd(_{UseCaseVar(op.ReturnUseCase)}.{UseCaseWriter.ResumeMethod(op.ReturnOperation)}); "
+                : "";
+            return $"  void {op.Label}({pars}) {{ {onEnd}_{UseCaseVar(op.TargetUseCase!)}.{op.Target.Label}({args}); }}";
         });
         var content = FillTemplate(LoadTemplate("Controller.txt"),
             ("UseCaseImports", string.Join("\n", imports)),
@@ -493,81 +500,63 @@ public class FlutterCodeGenerator
     {
         if (ir.UseCases.Count == 0 || ir.Views.Count == 0)
         {
-            var simpleApp = "// Generated from IR\nimport 'package:flutter/material.dart';\nimport 'package:provider/provider.dart';\n\nclass App extends StatelessWidget {\n  const App({super.key});\n  @override\n  Widget build(BuildContext context) {\n    return MaterialApp(\n      title: 'Generated App',\n      home: const Scaffold(body: Center(child: Text('Generated Flutter App'))),\n    );\n  }\n}\n";
+            var simpleApp = "// Generated from IR\nimport 'package:flutter/material.dart';\n\nclass App extends StatelessWidget {\n  const App({super.key});\n  @override\n  Widget build(BuildContext context) {\n    return const Scaffold(body: Center(child: Text('Generated Flutter App')));\n  }\n}\n";
             File.WriteAllText(Path.Combine(libPath, "app.dart"), simpleApp);
             return;
         }
 
-        string UcVar(UseCaseClass u) => "_" + char.ToLowerInvariant(u.Label[0]) + u.Label[1..] + "UseCase";
+        string UcVar(UseCaseClass u) => "_" + Naming.LowerFirst(u.Label) + "UseCase";
+        string CtrlVar(ControllerClass c) => "_" + Naming.LowerFirst(c.Label);
+        string PresVar(PresenterClass p) => Naming.LowerFirst(p.Label);
 
-        var presenterImports = ir.Presenters.Select(p => "import 'presenters/" + ToSnakeCase(p.Label) + "_presenter.dart';").ToList();
-        var useCaseImports = ir.UseCases.Select(uc => "import 'use_cases/" + ToSnakeCase(uc.Label) + "_use_case.dart';").ToList();
-        var controllerImports = ir.Views.Where(v => v.Controller != null).Select(v => v.Controller!)
-            .Distinct().Select(c => "import 'controllers/" + ControllerFile(c) + "';").ToList();
-        var viewImports = ir.Views.Select(v => "import 'views/" + ToSnakeCase(v.Label) + "_view.dart';").ToList();
+        var views = ir.Views.Where(v => v.Controller != null && v.Presenter != null).ToList();
         var allServices = ir.UseCases.SelectMany(u => u.Services).DistinctBy(s => s.Label).ToList();
-        var serviceProxyImports = allServices.Select(s => "import 'services/" + ServiceProxyFile(s) + "';").ToList();
+        var imports = ir.Presenters.Select(p => "import 'presenters/" + ToSnakeCase(p.Label) + "_presenter.dart';")
+            .Append("import 'presenters/view_presenter.dart';")
+            .Concat(ir.UseCases.Select(uc => "import 'use_cases/" + ToSnakeCase(uc.Label) + "_use_case.dart';"))
+            .Concat(views.Select(v => "import 'controllers/" + ControllerFile(v.Controller!) + "';"))
+            .Concat(views.Select(v => "import 'views/" + ToSnakeCase(v.Label) + "_view.dart';"))
+            .Concat(allServices.Select(s => "import 'services/" + ServiceProxyFile(s) + "';"));
 
-        var useCaseFields = ir.UseCases.Select(uc => "  " + uc.Label + "UseCase? " + UcVar(uc) + ";").ToList();
-        var controllerFields = ir.Views.Where(v => v.Controller != null).Select(v =>
-        {
-            var c = v.Controller!;
-            var ctrlVar = char.ToLowerInvariant(c.Label[0]) + c.Label[1..];
-            return "  late " + c.Label + " _" + ctrlVar + ";";
-        }).ToList();
+        var fields = ir.UseCases.Select(uc => $"  late final {uc.Label}UseCase {UcVar(uc)};")
+            .Concat(views.Select(v => $"  late final {v.Controller!.Label} {CtrlVar(v.Controller!)};"));
 
-        var allPresenters = ir.UseCases.SelectMany(u => u.Presenters).DistinctBy(p => p.Label).ToList();
-        var presenterReads = allPresenters.Select(p =>
-        {
-            var varName = char.ToLowerInvariant(p.Label[0]) + p.Label[1..];
-            return "      final " + varName + " = context.read<" + p.Label + ">();";
-        }).ToList();
-        var serviceCreations = allServices.Select(s => "      final " + ServiceVar(s) + " = " + ServiceProxyClass(s) + "();").ToList();
-
+        var presenterReads = ir.Presenters.Select(p => $"    final {PresVar(p)} = context.read<{p.Label}>();");
+        var serviceCreations = allServices.Select(s => $"    final {ServiceVar(s)} = {ServiceProxyClass(s)}();");
         var useCaseCreations = ir.UseCases.Select(uc =>
         {
-            var ucVar = UcVar(uc);
-            var useCaseType = uc.Label + "UseCase";
-            var useCaseParams = new List<string>();
-            foreach (var p in uc.Presenters)
-                useCaseParams.Add(char.ToLowerInvariant(p.Label[0]) + p.Label[1..] + ": " + (char.ToLowerInvariant(p.Label[0]) + p.Label[1..]));
-            foreach (var s in uc.Services)
-                useCaseParams.Add(ServiceVar(s) + ": " + ServiceVar(s));
-            return "      " + ucVar + " = " + useCaseType + "(" + string.Join(", ", useCaseParams) + ");";
-        }).ToList();
-        var firstUcVar = UcVar(ir.UseCases.First());
-        var controllerCreations = ir.Views.Where(v => v.Controller != null).Select(v =>
+            var args = uc.Presenters.Select(p => $"{PresVar(p)}: {PresVar(p)}")
+                .Concat(uc.Services.Select(s => $"{ServiceVar(s)}: {ServiceVar(s)}"));
+            return $"    {UcVar(uc)} = {uc.Label}UseCase({string.Join(", ", args)});";
+        });
+        var connections = ir.UseCases.Select(uc => (uc, invoked: UseCaseWriter.SystemInvokedUseCases(uc)))
+            .Where(x => x.invoked.Count > 0)
+            .Select(x => $"    {UcVar(x.uc)}.connectUseCases({string.Join(", ", x.invoked.Select(u => $"{Naming.LowerFirst(u.Label)}UseCase: {UcVar(u)}"))});");
+        var controllerCreations = views.Select(v =>
         {
             var c = v.Controller!;
-            var ctrlVar = char.ToLowerInvariant(c.Label[0]) + c.Label[1..];
-            var args = c.TargetUseCases.Select(u => UseCaseVar(u) + ": " + UcVar(u) + "!");
-            return "      _" + ctrlVar + " = " + c.Label + "(" + string.Join(", ", args) + ");";
-        }).ToList();
+            var args = c.TargetUseCases.Select(u => UseCaseVar(u) + ": " + UcVar(u));
+            return $"    {CtrlVar(c)} = {c.Label}({string.Join(", ", args)});";
+        });
 
-        var viewTiles = ir.Presenters
-            .Where(p => ir.Views.Any(v => v.Presenter?.Label == p.Label && v.Controller != null))
-            .Select(p =>
-            {
-                var v = ir.Views.First(v => v.Presenter?.Label == p.Label && v.Controller != null);
-                var viewName = v.Label + "View";
-                var ctrlVar = char.ToLowerInvariant(v.Controller!.Label[0]) + v.Controller!.Label[1..];
-                var title = p.Label.StartsWith("P") && p.Label.Length > 1 ? p.Label[1..] : p.Label;
-                return "            ListTile(title: const Text('" + title + "'), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => " + viewName + "(controller: _" + ctrlVar + ")))),";
-            }).ToList();
+        // Punkt startu: operacja wejściowa przypadku użycia „Start” (albo pierwszego, jeśli go brak).
+        var start = ir.UseCases.FirstOrDefault(u => u.IsInitial) ?? ir.UseCases[0];
+        var viewWidgets = views.Select(v => $"            {v.Label}View(controller: {CtrlVar(v.Controller!)}),");
+        var viewPresenters = views.Select(v => PresVar(v.Presenter!));
+        var viewTiles = views.Select((v, i) =>
+            $"          ListTile(title: const Text('{v.Label}'), onTap: () => _openForDiagnostics(context, {i}, {v.Label}View(controller: {CtrlVar(v.Controller!)}))),");
 
         var content = FillTemplate(LoadTemplate("App.txt"),
-            ("PresenterImports", string.Join("\n", presenterImports)),
-            ("UseCaseImports", string.Join("\n", useCaseImports)),
-            ("ControllerImports", string.Join("\n", controllerImports)),
-            ("ViewImports", string.Join("\n", viewImports)),
-            ("ServiceProxyImports", string.Join("\n", serviceProxyImports)),
-            ("UseCaseFields", string.Join("\n", useCaseFields)),
-            ("UseCaseNullCheck", firstUcVar + " == null"),
-            ("ControllerFields", string.Join("\n", controllerFields)),
+            ("Imports", string.Join("\n", imports)),
+            ("Fields", string.Join("\n", fields)),
             ("PresenterReads", string.Join("\n", presenterReads)),
             ("ServiceCreations", string.Join("\n", serviceCreations)),
             ("UseCaseCreations", string.Join("\n", useCaseCreations)),
+            ("UseCaseConnections", string.Join("\n", connections)),
             ("ControllerCreations", string.Join("\n", controllerCreations)),
+            ("ViewPresenters", string.Join(", ", viewPresenters)),
+            ("StartCall", $"{UcVar(start)}.{start.EntryOperation!.Label}()"),
+            ("ViewWidgets", string.Join("\n", viewWidgets)),
             ("ViewTiles", string.Join("\n", viewTiles)));
         File.WriteAllText(Path.Combine(libPath, "app.dart"), content);
     }

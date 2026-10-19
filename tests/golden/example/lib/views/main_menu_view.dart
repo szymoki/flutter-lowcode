@@ -17,14 +17,6 @@ class _MainMenuViewState extends State<MainMenuView> {
 
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<PMainMenu>().show();
-    });
-  }
-
-  @override
   void dispose() {
 
     super.dispose();

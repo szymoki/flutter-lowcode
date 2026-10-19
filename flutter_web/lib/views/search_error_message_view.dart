@@ -17,14 +17,6 @@ class _SearchErrorMessageViewState extends State<SearchErrorMessageView> {
 
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<PSearchErrorMessage>().show();
-    });
-  }
-
-  @override
   void dispose() {
 
     super.dispose();

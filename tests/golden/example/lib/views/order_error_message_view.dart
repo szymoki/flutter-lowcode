@@ -17,14 +17,6 @@ class _OrderErrorMessageViewState extends State<OrderErrorMessageView> {
 
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<POrderErrorMessage>().show();
-    });
-  }
-
-  @override
   void dispose() {
 
     super.dispose();

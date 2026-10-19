@@ -1,15 +1,8 @@
 // Generated from IR
-import 'package:flutter/foundation.dart';
-{{ModelImports}}
+{{ModelImports}}import 'view_presenter.dart';
 
-class {{ClassName}} extends ChangeNotifier {
-  bool _isVisible = false;
-  bool get isVisible => _isVisible;
+class {{ClassName}} extends ViewPresenter {
 {{Fields}}
 
 {{Methods}}
-
-  void show() { _isVisible = true; notifyListeners(); }
-  void hide() { _isVisible = false; notifyListeners(); }
-  void clear() { _isVisible = false; notifyListeners(); }
 }

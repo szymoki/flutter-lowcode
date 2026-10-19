@@ -9,6 +9,7 @@ class DeleteOrderUseCase {
   final POrderDeletedMessage _pOrderDeletedMessage;
   final IOrder _order;
   Order? _currentOrder;
+  void Function(String result)? _onEnd;
 
   DeleteOrderUseCase({ required PDeleteConfirmationMessage pDeleteConfirmationMessage, required POrderDeletedMessage pOrderDeletedMessage, required IOrder order }) : _pDeleteConfirmationMessage = pDeleteConfirmationMessage,
       _pOrderDeletedMessage = pOrderDeletedMessage,
@@ -16,6 +17,10 @@ class DeleteOrderUseCase {
 
   void setOrder(Order value) {
     _currentOrder = value;
+  }
+
+  void setOnEnd(void Function(String result) onEnd) {
+    _onEnd = onEnd;
   }
 
   void execute() {}
@@ -46,5 +51,8 @@ class DeleteOrderUseCase {
 
   void _end(String result) {
     _hideViews();
+    final onEnd = _onEnd;
+    _onEnd = null;
+    onEnd?.call(result);
   }
 }

@@ -17,14 +17,6 @@ class _DeleteConfirmationMessageViewState extends State<DeleteConfirmationMessag
 
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<PDeleteConfirmationMessage>().show();
-    });
-  }
-
-  @override
   void dispose() {
 
     super.dispose();

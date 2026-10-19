@@ -17,14 +17,6 @@ class _OrderDeletedMessageViewState extends State<OrderDeletedMessageView> {
 
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<POrderDeletedMessage>().show();
-    });
-  }
-
-  @override
   void dispose() {
 
     super.dispose();

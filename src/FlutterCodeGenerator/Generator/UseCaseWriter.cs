@@ -18,15 +18,37 @@ internal class UseCaseWriter
     private readonly List<ServiceInterface> _checkFields = new();
     private bool _usesHideViews;
     private bool _usesEnd;
+    private readonly bool _isInvoked;
 
-    public UseCaseWriter(UseCaseClass uc, IReadOnlyDictionary<string, DataAggregate> aggregates, List<string> warnings)
+    /// <param name="isInvoked">Przypadek użycia jest wywoływany przez inny; dostaje <c>setOnEnd</c> i powiadamia wywołującego o końcu.</param>
+    public UseCaseWriter(UseCaseClass uc, IReadOnlyDictionary<string, DataAggregate> aggregates, List<string> warnings, bool isInvoked)
     {
         _uc = uc;
         _aggregates = aggregates;
         _warnings = warnings;
+        _isInvoked = isInvoked;
         foreach (var op in uc.Operations)
+        {
             Analyze(op.Instructions);
+            Analyze(op.ResumeInstructions);
+        }
     }
+
+    public static string UseCaseField(UseCaseClass uc) => "_" + Naming.LowerFirst(uc.Label) + "UseCase";
+    public static string ResumeMethod(UCOperation op) => "resume" + Naming.UpperFirst(op.Label);
+
+    /// <summary>Przypadki użycia wywoływane systemowym &lt;invoke&gt;; wstrzykiwane metodą <c>connectUseCases</c>.</summary>
+    public static List<UseCaseClass> SystemInvokedUseCases(UseCaseClass uc) =>
+        uc.Operations.SelectMany(o => Calls(o.Instructions).Concat(Calls(o.ResumeInstructions)))
+            .Select(c => c.TargetUseCase).OfType<UseCaseClass>().Distinct().ToList();
+
+    private static IEnumerable<Call> Calls(IEnumerable<Instruction> instructions) =>
+        instructions.SelectMany(i => i switch
+        {
+            Call c => new[] { c },
+            Decision d => d.Conditions.SelectMany(c => Calls(c.Instructions)),
+            _ => Enumerable.Empty<Call>()
+        });
 
     public static string DataField(string aggregateLabel) => "_current" + aggregateLabel;
     public static string CheckField(ServiceInterface si) => "_" + Naming.Camel(si.NotionName) + "CheckResult";
@@ -41,10 +63,16 @@ internal class UseCaseWriter
             .Concat(_checkFields.Select(CheckEnum))
             .Distinct().OrderBy(t => t, StringComparer.Ordinal);
 
+    public IEnumerable<string> UseCaseImports =>
+        SystemInvokedUseCases(_uc).Select(u => $"import '{Naming.SnakeFromPascal(u.Label)}_use_case.dart';");
+
     public string Fields()
     {
         var lines = _dataFields.Select(d => $"  {d}? {DataField(d)};")
-            .Concat(_checkFields.Select(si => $"  {CheckEnum(si)}? {CheckField(si)};"));
+            .Concat(_checkFields.Select(si => $"  {CheckEnum(si)}? {CheckField(si)};"))
+            .Concat(SystemInvokedUseCases(_uc).Select(u => $"  late final {u.Label}UseCase {UseCaseField(u)};"));
+        if (_isInvoked && _usesEnd)
+            lines = lines.Append("  void Function(String result)? _onEnd;");
         return string.Join("\n", lines);
     }
 
@@ -55,8 +83,27 @@ internal class UseCaseWriter
         foreach (var label in _uc.ContextData.Select(d => d.Label).Where(_dataFields.Contains))
             sb.Append($"  void set{label}({label} value) {{\n    {DataField(label)} = value;\n  }}\n\n");
 
+        var invoked = SystemInvokedUseCases(_uc);
+        if (invoked.Count > 0)
+        {
+            // Przypadki użycia mogą wywoływać się nawzajem, więc nie mogą być parametrami konstruktora.
+            var pars = string.Join(", ", invoked.Select(u => $"required {u.Label}UseCase {Naming.LowerFirst(u.Label)}UseCase"));
+            sb.Append($"  void connectUseCases({{{pars}}}) {{\n");
+            foreach (var u in invoked)
+                sb.Append($"    {UseCaseField(u)} = {Naming.LowerFirst(u.Label)}UseCase;\n");
+            sb.Append("  }\n\n");
+        }
+        if (_isInvoked)
+            sb.Append(_usesEnd
+                ? "  void setOnEnd(void Function(String result) onEnd) {\n    _onEnd = onEnd;\n  }\n\n"
+                : "  void setOnEnd(void Function(String result) onEnd) {}\n\n");
+
         foreach (var op in _uc.Operations)
+        {
             sb.Append(Method(op)).Append('\n');
+            if (op.IsInvoking)
+                sb.Append(ResumeMethodText(op)).Append('\n');
+        }
 
         if (_usesHideViews)
         {
@@ -66,7 +113,9 @@ internal class UseCaseWriter
             sb.Append("  }\n\n");
         }
         if (_usesEnd)
-            sb.Append("  void _end(String result) {\n    _hideViews();\n  }\n\n");
+            sb.Append(_isInvoked
+                ? "  void _end(String result) {\n    _hideViews();\n    final onEnd = _onEnd;\n    _onEnd = null;\n    onEnd?.call(result);\n  }\n\n"
+                : "  void _end(String result) {\n    _hideViews();\n  }\n\n");
         return sb.ToString().TrimEnd('\n');
     }
 
@@ -91,6 +140,16 @@ internal class UseCaseWriter
         return body.Length == 0
             ? $"  {Signature(op)} {{}}\n"
             : $"  {Signature(op)} {{\n{body}  }}\n";
+    }
+
+    private string ResumeMethodText(UCOperation op)
+    {
+        var body = new StringBuilder();
+        EmitInstructions(op.ResumeInstructions, body, "    ");
+        var signature = IsAsync(op.ResumeInstructions)
+            ? $"Future<void> {ResumeMethod(op)}(String result) async"
+            : $"void {ResumeMethod(op)}(String result)";
+        return body.Length == 0 ? $"  {signature} {{}}\n" : $"  {signature} {{\n{body}  }}\n";
     }
 
     private void Analyze(IEnumerable<Instruction> instructions)
@@ -147,7 +206,9 @@ internal class UseCaseWriter
                     sb.Append(indent).Append(ServiceCall(c)).Append('\n');
                     break;
                 case Call c when c.TargetUseCase != null:
-                    _warnings.Add($"{_uc.Label}: systemowe <invoke> {c.TargetUseCase.Label} nie jest jeszcze generowane.");
+                    if (c.ResumeOperation != null)
+                        sb.Append($"{indent}{UseCaseField(c.TargetUseCase)}.setOnEnd({ResumeMethod(c.ResumeOperation)});\n");
+                    sb.Append($"{indent}{UseCaseField(c.TargetUseCase)}.{c.OperationRef}();\n");
                     break;
                 case Decision d:
                     EmitDecision(d, sb, indent);

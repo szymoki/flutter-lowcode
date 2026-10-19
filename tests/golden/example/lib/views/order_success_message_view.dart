@@ -17,14 +17,6 @@ class _OrderSuccessMessageViewState extends State<OrderSuccessMessageView> {
 
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<POrderSuccessMessage>().show();
-    });
-  }
-
-  @override
   void dispose() {
 
     super.dispose();
