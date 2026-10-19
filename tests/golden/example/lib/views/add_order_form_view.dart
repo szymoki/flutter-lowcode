@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../presenters/padd_order_form_presenter.dart';
 import '../controllers/add_order_form_controller.dart';
+import '../models/order.dart';
 
 class AddOrderFormView extends StatefulWidget {
   final CAddOrderForm controller;
@@ -34,6 +35,19 @@ class _AddOrderFormViewState extends State<AddOrderFormView> {
     super.dispose();
   }
 
+  Order? _buildOrder() {
+    final number = int.tryParse(_orderNumberController.text);
+    if (number == null) {
+      _showInvalidValue('Number');
+      return null;
+    }
+    return Order(number: number, title: _orderTitleController.text, dates: _orderDatesController.text);
+  }
+
+  void _showInvalidValue(String field) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Nieprawidłowa wartość pola $field')));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<PAddOrderForm>(
@@ -48,7 +62,7 @@ class _AddOrderFormViewState extends State<AddOrderFormView> {
                 Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: _orderNumberController, decoration: const InputDecoration(labelText: 'Number', border: OutlineInputBorder()), keyboardType: TextInputType.number,)),
                 Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: _orderTitleController, decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder()),)),
                 Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: _orderDatesController, decoration: const InputDecoration(labelText: 'Dates', border: OutlineInputBorder()),)),
-                ElevatedButton(onPressed: () => widget.controller.onAdd(), child: const Text('add')),
+                ElevatedButton(onPressed: () { final order = _buildOrder(); if (order == null) return; widget.controller.onAdd(order); }, child: const Text('add')),
                 ElevatedButton(onPressed: () => widget.controller.onCancel(), child: const Text('cancel')),
               ],
             ),

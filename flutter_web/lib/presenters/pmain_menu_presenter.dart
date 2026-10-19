@@ -8,6 +8,7 @@ class PMainMenu extends ChangeNotifier {
 
 
   void showMainMenu() {
+    _isVisible = true;
     notifyListeners();
   }
 

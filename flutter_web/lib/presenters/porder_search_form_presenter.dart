@@ -8,6 +8,7 @@ class POrderSearchForm extends ChangeNotifier {
 
 
   void showOrderSearchForm() {
+    _isVisible = true;
     notifyListeners();
   }
 

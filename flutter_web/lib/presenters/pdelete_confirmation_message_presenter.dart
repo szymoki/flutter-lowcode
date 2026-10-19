@@ -8,6 +8,7 @@ class PDeleteConfirmationMessage extends ChangeNotifier {
 
 
   void showDeleteConfirmationMessage() {
+    _isVisible = true;
     notifyListeners();
   }
 

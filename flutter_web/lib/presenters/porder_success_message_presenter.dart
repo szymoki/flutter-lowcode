@@ -8,6 +8,7 @@ class POrderSuccessMessage extends ChangeNotifier {
 
 
   void showOrderSuccessMessage() {
+    _isVisible = true;
     notifyListeners();
   }
 

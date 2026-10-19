@@ -63,6 +63,8 @@ public class FlutterCodeGenerator
         };
     }
 
+    public List<string> Warnings { get; } = new();
+
     private HashSet<string> AggregateLabels = new();
 
     private static string ItemDartType(DataItem item) =>
@@ -239,7 +241,7 @@ public class FlutterCodeGenerator
         {
             var allParams = g.SelectMany(m => m.Parameters).DistinctBy(p => p.Label).ToList();
             var pars = allParams.Count > 0
-                ? string.Join(", ", allParams.Select(p => $"{p.Type}? {char.ToLowerInvariant(p.Label[0]) + p.Label[1..]}"))
+                ? "{" + string.Join(", ", allParams.Select(p => $"{p.Type}? {char.ToLowerInvariant(p.Label[0]) + p.Label[1..]}")) + "}"
                 : "";
             var assigns = allParams.Select(p =>
             {
@@ -247,7 +249,7 @@ public class FlutterCodeGenerator
                 return $"    if ({name} != null) _{name} = {name};";
             }).ToList();
             var body = assigns.Count > 0 ? string.Join("\n", assigns) + "\n    " : "";
-            return "  void " + g.Key + "(" + pars + ") {\n    " + body + "notifyListeners();\n  }\n";
+            return "  void " + g.Key + "(" + pars + ") {\n    " + body + "_isVisible = true;\n    notifyListeners();\n  }\n";
         }).ToList();
         var content = FillTemplate(LoadTemplate("Presenter.txt"),
             ("ClassName", pres.Label),
@@ -276,7 +278,8 @@ public class FlutterCodeGenerator
             initParts.Add($"_{ServiceVar(s)} = {ServiceVar(s)}");
         var initializerList = initParts.Count > 0 ? ": " + string.Join(",\n      ", initParts) + ";" : ";";
 
-        var operationMethodsCode = string.Join("\n", uc.Operations.Select(op => $"  void {op.Label}() {{}}"));
+        var writer = new UseCaseWriter(uc, AggregatesByLabel, Warnings);
+        var modelImports = writer.UsedModelTypes.Select(t => ModelImport(t)).ToList();
 
         var presenterImports = uc.Presenters.Select(p => "import '../presenters/" + ToSnakeCase(p.Label) + "_presenter.dart';").ToList();
         var serviceImports = uc.Services.Select(s => "import '../services/" + ServiceInterfaceFile(s) + "';").ToList();
@@ -285,13 +288,15 @@ public class FlutterCodeGenerator
 
         var content = FillTemplate(LoadTemplate("UseCase.txt"),
             ("ClassName", uc.Label),
+            ("ModelImports", modelImports.Count > 0 ? string.Join("\n", modelImports) + "\n" : ""),
             ("PresenterImports", string.Join("\n", presenterImports)),
             ("ServiceImports", string.Join("\n", serviceImports)),
             ("PresenterFields", presenterFields),
             ("ServiceFields", serviceFields),
+            ("DataFields", writer.Fields()),
             ("ConstructorParams", constructorParams),
             ("InitializerList", initializerList),
-            ("OperationMethods", operationMethodsCode));
+            ("OperationMethods", writer.Methods()));
         File.WriteAllText(Path.Combine(useCasesPath, ToSnakeCase(uc.Label) + "_use_case.dart"), content);
     }
 
@@ -301,7 +306,9 @@ public class FlutterCodeGenerator
     private void WriteController(ControllerClass ctrl, string controllersPath)
     {
         var useCases = ctrl.TargetUseCases.ToList();
-        var imports = useCases.Select(u => "import '../use_cases/" + ToSnakeCase(u.Label) + "_use_case.dart';");
+        var inputTypes = ctrl.Operations.SelectMany(o => o.Target!.InputData).Select(d => d.Label).Distinct().OrderBy(t => t, StringComparer.Ordinal);
+        var imports = inputTypes.Select(t => ModelImport(t))
+            .Concat(useCases.Select(u => "import '../use_cases/" + ToSnakeCase(u.Label) + "_use_case.dart';"));
         var fields = useCases.Select(u => $"  final {u.Label}UseCase _{UseCaseVar(u)};");
         var ctorParams = useCases.Count > 0
             ? "{" + string.Join(", ", useCases.Select(u => $"required {u.Label}UseCase {UseCaseVar(u)}")) + "}"
@@ -310,7 +317,12 @@ public class FlutterCodeGenerator
             ? " : " + string.Join(", ", useCases.Select(u => $"_{UseCaseVar(u)} = {UseCaseVar(u)}"))
             : "";
         var methods = ctrl.Operations.Select(op =>
-            $"  void {op.Label}() {{ _{UseCaseVar(op.TargetUseCase!)}.{op.Target!.Label}(); }}");
+        {
+            var input = op.Target!.InputData;
+            var pars = string.Join(", ", input.Select(d => $"{d.Label} {Naming.LowerFirst(d.Label)}"));
+            var args = string.Join(", ", input.Select(d => Naming.LowerFirst(d.Label)));
+            return $"  void {op.Label}({pars}) {{ _{UseCaseVar(op.TargetUseCase!)}.{op.Target.Label}({args}); }}";
+        });
         var content = FillTemplate(LoadTemplate("Controller.txt"),
             ("UseCaseImports", string.Join("\n", imports)),
             ("ControllerName", ctrl.Label),
@@ -333,8 +345,16 @@ public class FlutterCodeGenerator
         var triggers = vw.Triggers.Select(t =>
         {
             var methodName = "on" + char.ToUpperInvariant(t.Label[0]) + t.Label[1..];
-            return $"                ElevatedButton(onPressed: () => widget.controller.{methodName}(), child: const Text('{t.Label}')),";
+            var input = vw.Controller!.Operations.FirstOrDefault(o => o.Label == methodName)?.Target?.InputData ?? new List<DataAggregate>();
+            if (input.Count == 0)
+                return $"                ElevatedButton(onPressed: () => widget.controller.{methodName}(), child: const Text('{t.Label}')),";
+            // Obiekty modelu z pól formularza; null oznacza błąd konwersji, zgłoszony już użytkownikowi (D8.3).
+            var builds = string.Join(" ", input.Select(d => $"final {Naming.LowerFirst(d.Label)} = _build{d.Label}(); if ({Naming.LowerFirst(d.Label)} == null) return;"));
+            var args = string.Join(", ", input.Select(d => Naming.LowerFirst(d.Label)));
+            return $"                ElevatedButton(onPressed: () {{ {builds} widget.controller.{methodName}({args}); }}, child: const Text('{t.Label}')),";
         }).ToList();
+        var builders = vw.EditableData.Select(d => ModelBuilder(d, editable)).ToList();
+        var needsModelImports = vw.EditableData.Count > 0;
         var bodyChildren = string.Join("\n", dataWidgets.Concat(formFields).Concat(triggers));
         var disposeCalls = string.Join("\n", editable.Select(f => "    " + f.ControllerVar + ".dispose();"));
         var content = FillTemplate(LoadTemplate("View.txt"),
@@ -343,10 +363,64 @@ public class FlutterCodeGenerator
             ("ControllerSnake", ToSnakeCase(controllerName[1..])),
             ("PresenterName", presenterName),
             ("PresenterSnake", ToSnakeCase(presenterName)),
+            ("ModelImports", needsModelImports ? string.Join("\n", vw.EditableData.Select(d => ModelImport(d.Label))) + "\n" : ""),
             ("Fields", string.Join("\n", fields)),
             ("DisposeCalls", disposeCalls),
+            ("Builders", builders.Count > 0
+                ? "\n" + string.Join("\n", builders) + (builders.Any(b => b.Contains("_showInvalidValue(")) ? InvalidValueHelper : "\n")
+                : ""),
             ("BodyChildren", bodyChildren));
         File.WriteAllText(Path.Combine(viewsPath, ToSnakeCase(viewName) + "_view.dart"), content);
+    }
+
+    private const string InvalidValueHelper = """
+
+  void _showInvalidValue(String field) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Nieprawidłowa wartość pola $field')));
+  }
+
+""";
+
+    /// <summary>Metoda widoku budująca obiekt modelu z pól formularza (null przy błędzie konwersji).</summary>
+    private string ModelBuilder(DataAggregate agg, List<EditableField> editable)
+    {
+        var sb = new StringBuilder();
+        sb.Append($"  {agg.Label}? _build{agg.Label}() {{\n");
+        var args = new List<string>();
+        foreach (var item in agg.Items)
+        {
+            var name = ItemVar(item);
+            var field = editable.FirstOrDefault(f => f.Aggregate == agg && f.Item == item);
+            if (item.IsList)
+            {
+                args.Add($"{name}: const []");
+                continue;
+            }
+            if (field == null)
+            {
+                Warnings.Add($"{agg.Label}.{item.Label}: atrybut typu {item.TypeKind} nie ma pola w formularzu; obiekt nie zostanie zbudowany.");
+                args.Add($"{name}: throw UnimplementedError('{agg.Label}.{name}')");
+                continue;
+            }
+            var text = field.ControllerVar + ".text";
+            var parse = item.TypeKind.ToLowerInvariant() switch
+            {
+                "integer" => $"int.tryParse({text})",
+                "float" => $"double.tryParse({text})",
+                "date" => $"DateTime.tryParse({text})",
+                _ => null
+            };
+            if (parse == null)
+            {
+                args.Add(item.TypeKind.ToLowerInvariant() == "boolean" ? $"{name}: {text} == 'true'" : $"{name}: {text}");
+                continue;
+            }
+            sb.Append($"    final {name} = {parse};\n");
+            sb.Append($"    if ({name} == null) {{\n      _showInvalidValue('{item.Label}');\n      return null;\n    }}\n");
+            args.Add($"{name}: {name}");
+        }
+        sb.Append($"    return {agg.Label}({string.Join(", ", args)});\n  }}\n");
+        return sb.ToString();
     }
 
     private record EditableField(DataAggregate Aggregate, DataItem Item, string ControllerVar);

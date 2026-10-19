@@ -30,7 +30,9 @@ public class Stage3UseCaseOperationTests
         foreach (var uc in ir.UseCases)
         {
             var code = p.Read("use_cases/" + Naming.SnakeFromPascal(uc.Label) + "_use_case.dart");
-            var methods = Regex.Matches(code, @"^  (?:void|Future<void>) (\w+)\(", RegexOptions.Multiline).Select(m => m.Groups[1].Value).ToList();
+            var methods = Regex.Matches(code, @"^  (?:void|Future<void>) (\w+)\(", RegexOptions.Multiline).Select(m => m.Groups[1].Value)
+                // Metody pomocnicze (_hideViews) i settery danych kontekstu (setOrder) nie są operacjami IR.
+                .Where(n => !n.StartsWith('_') && !Regex.IsMatch(n, "^set[A-Z]")).ToList();
             Assert.Equal(uc.Operations.Select(o => o.Label).OrderBy(x => x, StringComparer.Ordinal), methods.OrderBy(x => x, StringComparer.Ordinal));
         }
         Assert.DoesNotContain("handleFindOrder", p.Read("use_cases/start_use_case.dart"));

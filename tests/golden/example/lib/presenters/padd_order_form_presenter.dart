@@ -8,6 +8,7 @@ class PAddOrderForm extends ChangeNotifier {
 
 
   void showAddOrderForm() {
+    _isVisible = true;
     notifyListeners();
   }
 

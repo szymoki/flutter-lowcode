@@ -8,6 +8,8 @@ public class UseCaseClass
     public List<PresenterClass> Presenters { get; } = new();
     public List<ServiceInterface> Services { get; } = new();
     public List<UseCaseClass> InvokedUseCases { get; } = new();
+    /// <summary>Agregaty z warunków kontekstowych (<c>{…; order}</c>).</summary>
+    public List<DataAggregate> ContextData { get; } = new();
 
     /// <summary>
     /// Operacja uruchamiająca przypadek użycia z zewnątrz: operacja pierwszego zdania <c>&lt;select&gt;</c>,
@@ -29,5 +31,7 @@ public class UCOperation
     public ViewWidget? SourceView { get; set; }
     /// <summary>Nazwa wyzwalacza RSL, z której powstała etykieta operacji („close”).</summary>
     public string? TriggerNotion { get; set; }
+    /// <summary>Dane z formularza przekazywane przez widok przy wyzwoleniu operacji.</summary>
+    public List<DataAggregate> InputData { get; } = new();
     public List<Instruction> Instructions { get; } = new();
 }

@@ -8,6 +8,7 @@ class POrderErrorMessage extends ChangeNotifier {
 
 
   void showOrderErrorMessage() {
+    _isVisible = true;
     notifyListeners();
   }
 

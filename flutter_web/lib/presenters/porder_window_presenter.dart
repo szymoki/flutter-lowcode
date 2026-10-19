@@ -9,8 +9,9 @@ class POrderWindow extends ChangeNotifier {
   Order? _order;
   Order? get order => _order;
 
-  void showOrderWindow(Order? order) {
+  void showOrderWindow({Order? order}) {
         if (order != null) _order = order;
+    _isVisible = true;
     notifyListeners();
   }
 

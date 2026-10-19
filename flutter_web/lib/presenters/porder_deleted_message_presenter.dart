@@ -8,6 +8,7 @@ class POrderDeletedMessage extends ChangeNotifier {
 
 
   void showOrderDeletedMessage() {
+    _isVisible = true;
     notifyListeners();
   }
 

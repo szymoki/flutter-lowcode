@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../presenters/{{PresenterSnake}}_presenter.dart';
 import '../controllers/{{ControllerSnake}}_controller.dart';
-
+{{ModelImports}}
 class {{ViewName}}View extends StatefulWidget {
   final {{ControllerName}} controller;
 
@@ -29,7 +29,7 @@ class _{{ViewName}}ViewState extends State<{{ViewName}}View> {
 {{DisposeCalls}}
     super.dispose();
   }
-
+{{Builders}}
   @override
   Widget build(BuildContext context) {
     return Consumer<{{PresenterName}}>(

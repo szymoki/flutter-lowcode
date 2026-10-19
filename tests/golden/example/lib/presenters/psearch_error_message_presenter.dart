@@ -8,6 +8,7 @@ class PSearchErrorMessage extends ChangeNotifier {
 
 
   void showSearchErrorMessage() {
+    _isVisible = true;
     notifyListeners();
   }
 

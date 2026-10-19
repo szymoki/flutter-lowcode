@@ -57,7 +57,9 @@ public static class Pipeline
         result.Ir = irModel;
 
         Directory.CreateDirectory(outputFolder);
-        new Generator.FlutterCodeGenerator().Generate(irModel, outputFolder);
+        var generator = new Generator.FlutterCodeGenerator();
+        generator.Generate(irModel, outputFolder);
+        result.Warnings.AddRange(generator.Warnings);
 
         log.WriteLine($"Wygenerowano aplikację Flutter w: {Path.GetFullPath(outputFolder)}");
         return result;

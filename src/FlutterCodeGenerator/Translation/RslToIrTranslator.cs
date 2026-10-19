@@ -48,7 +48,11 @@ public class RslToIrTranslator
     {
         if (instr is Call c)
         {
-            var clone = new Call { Label = c.Label, OperationRef = c.OperationRef, TargetUseCase = c.TargetUseCase, TargetOperation = c.TargetOperation };
+            var clone = new Call
+            {
+                Label = c.Label, OperationRef = c.OperationRef, TargetUseCase = c.TargetUseCase, TargetOperation = c.TargetOperation,
+                Presenter = c.Presenter, Service = c.Service, ServiceOperation = c.ServiceOperation
+            };
             clone.Parameters.AddRange(c.Parameters.Select(p => new Parameter { Label = p.Label, IsAttribute = p.IsAttribute, Type = p.Type }));
             return clone;
         }
@@ -110,7 +114,10 @@ public class RslToIrTranslator
         EnsureCheckResultEnums(ir, ctx);
 
         foreach (var ucc in ir.UseCases)
+        {
             MakeOperationLabelsUnique(ucc);
+            PruneInputData(ucc);
+        }
         Warnings.AddRange(ctx.Warnings);
         Errors.AddRange(ctx.Errors);
         return ir;
@@ -206,6 +213,27 @@ public class RslToIrTranslator
         }
     }
 
+    /// <summary>
+    /// Operacja dostaje dane z formularza tylko wtedy, gdy jej instrukcje ich używają – inaczej
+    /// np. „cancel” wymagałby poprawnie wypełnionego formularza (D8.2).
+    /// </summary>
+    private static void PruneInputData(UseCaseClass ucc)
+    {
+        foreach (var op in ucc.Operations)
+        {
+            var used = UsedParameterTypes(op.Instructions).ToHashSet();
+            op.InputData.RemoveAll(d => !used.Contains(d.Label));
+        }
+    }
+
+    private static IEnumerable<string> UsedParameterTypes(IEnumerable<Instruction> instructions) =>
+        instructions.SelectMany(i => i switch
+        {
+            Call c => c.Parameters.Select(p => p.Type),
+            Decision d => d.Conditions.SelectMany(c => UsedParameterTypes(c.Instructions)),
+            _ => Enumerable.Empty<string>()
+        });
+
     private void ProcessUseCaseClause(UseCase uc, IrModel ir, TranslationContext ctx)
     {
         var ucc = ctx.UseCaseByName[uc.Name.Trim()];
@@ -236,6 +264,8 @@ public class RslToIrTranslator
                 var da = GetOrCreateDataAggregate(cc.Notion, ir);
                 if (!ctx.ContextDA.Contains(da))
                     ctx.ContextDA.Add(da);
+                if (ctx.CurrentUCC != null && !ctx.CurrentUCC.ContextData.Contains(da))
+                    ctx.CurrentUCC.ContextData.Add(da);
             }
             // Warunek na podmiocie „user” określa rolę aktora, a nie dane – nie tworzy usługi IUser.
             else if (cond is ValueCondition { Notion: "user" })
@@ -385,7 +415,7 @@ public class RslToIrTranslator
             po.Parameters.Add(new Parameter { Label = da.Label, Type = da.Label });
         vw.Presenter!.Methods.Add(po);
 
-        var call = new Call { Label = ctx.CurrentLabel, OperationRef = po.Label };
+        var call = new Call { Label = ctx.CurrentLabel, OperationRef = po.Label, Presenter = vw.Presenter };
         call.Parameters.AddRange(po.Parameters);
         AddInstruction(call, ctx);
 
@@ -472,6 +502,8 @@ public class RslToIrTranslator
             SourceView = ctx.CurrentVF,
             TriggerNotion = notion
         };
+        if (ctx.CurrentVF != null)
+            ucOp.InputData.AddRange(ctx.CurrentVF.EditableData);
         ctx.CurrentUCC?.Operations.Add(ucOp);
         ctx.CurrentUCO = ucOp;
         // Nowa operacja zaczyna się poza gałęzią decyzji poprzedniej operacji.
@@ -505,16 +537,23 @@ public class RslToIrTranslator
         var readAggregate = type == PredicateType.Read ? GetOrCreateDataAggregate(notion, ir) : null;
         if (type == PredicateType.Check)
             ctx.CheckedNotions.Add(notion);
-        var sop = new SOperation
+        var sopLabel = type.ToString().ToLowerInvariant() + ToPascalCase(notion);
+        var parameters = ctx.CurrentDAD.Concat(ctx.ContextDA).Distinct()
+            .Select(da => new Parameter { Label = da.Label, Type = da.Label }).ToList();
+        // Ta sama operacja w kilku miejscach specyfikacji to jedna metoda interfejsu (D8.5).
+        var sop = si.Methods.FirstOrDefault(m => m.Label == sopLabel);
+        if (sop == null)
         {
-            Label = type.ToString().ToLowerInvariant() + ToPascalCase(notion),
-            Type = type
-        };
-        foreach (var da in ctx.CurrentDAD.Concat(ctx.ContextDA).Distinct())
-            sop.Parameters.Add(new Parameter { Label = da.Label, Type = da.Label });
-        si.Methods.Add(sop);
+            sop = new SOperation { Label = sopLabel, Type = type };
+            sop.Parameters.AddRange(parameters);
+            si.Methods.Add(sop);
+        }
+        else if (!sop.Parameters.Select(p => p.Type).SequenceEqual(parameters.Select(p => p.Type)))
+            ctx.Warnings.Add($"Przypadek użycia „{ctx.CurrentUseCaseName}”: operacja {si.Label}.{sopLabel} była już użyta z parametrami " +
+                             $"({string.Join(", ", sop.Parameters.Select(p => p.Type))}); pozostają one bez zmian.");
 
-        var call = new Call { Label = ctx.CurrentLabel, OperationRef = sop.Label };
+        var call = new Call { Label = ctx.CurrentLabel, OperationRef = sop.Label, Service = si, ServiceOperation = sop };
+        call.Parameters.AddRange(sop.Parameters.Select(p => new Parameter { Label = p.Label, Type = p.Type }));
         AddInstruction(call, ctx);
 
         if (ctx.CurrentUCC != null && !ctx.CurrentUCC.Services.Contains(si))
