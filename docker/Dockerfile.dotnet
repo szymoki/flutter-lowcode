@@ -2,10 +2,10 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-COPY src/FlutterCodeGenerator.sln .
 COPY src/FlutterCodeGenerator/ ./FlutterCodeGenerator/
 
-RUN dotnet restore && dotnet publish FlutterCodeGenerator/FlutterCodeGenerator.csproj -c Release -o /app
+# Solucja odwołuje się też do ../tests, których nie ma w obrazie – budujemy sam projekt.
+RUN dotnet publish FlutterCodeGenerator/FlutterCodeGenerator.csproj -c Release -o /app
 
 FROM mcr.microsoft.com/dotnet/runtime:8.0
 WORKDIR /app

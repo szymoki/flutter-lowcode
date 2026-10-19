@@ -1,7 +1,9 @@
-
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlutterCodeGenerator", "FlutterCodeGenerator\FlutterCodeGenerator.csproj", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlutterCodeGenerator.Tests", "..\tests\FlutterCodeGenerator.Tests\FlutterCodeGenerator.Tests.csproj", "{0AC205F8-DFC3-4756-B87F-C8FFD82ECCDC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -13,5 +15,9 @@ Global
 		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0AC205F8-DFC3-4756-B87F-C8FFD82ECCDC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0AC205F8-DFC3-4756-B87F-C8FFD82ECCDC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0AC205F8-DFC3-4756-B87F-C8FFD82ECCDC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0AC205F8-DFC3-4756-B87F-C8FFD82ECCDC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
