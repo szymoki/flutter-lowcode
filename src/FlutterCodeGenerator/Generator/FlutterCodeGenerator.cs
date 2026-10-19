@@ -280,12 +280,7 @@ public class FlutterCodeGenerator
             initParts.Add($"_{ServiceVar(s)} = {ServiceVar(s)}");
         var initializerList = initParts.Count > 0 ? ": " + string.Join(",\n      ", initParts) + ";" : ";";
 
-        var operationMethods = new HashSet<string> { "execute", "handleClose" };
-        foreach (var ctrl in ir.Controllers.Where(c => c.UseCase?.Label == uc.Label))
-            foreach (var op in ctrl.Operations)
-                if (!string.IsNullOrEmpty(op.InvokedOperation))
-                    operationMethods.Add(op.InvokedOperation);
-        var operationMethodsCode = string.Join("\n", operationMethods.Select(m => $"  void {m}() {{}}"));
+        var operationMethodsCode = string.Join("\n", uc.Operations.Select(op => $"  void {op.Label}() {{}}"));
 
         var presenterImports = uc.Presenters.Select(p => "import '../presenters/" + ToSnakeCase(p.Label) + "_presenter.dart';").ToList();
         var serviceImports = uc.Services.Select(s => "import '../services/" + ServiceInterfaceFile(s) + "';").ToList();
@@ -304,20 +299,30 @@ public class FlutterCodeGenerator
         File.WriteAllText(Path.Combine(useCasesPath, ToSnakeCase(uc.Label) + "_use_case.dart"), content);
     }
 
+    private static string UseCaseVar(UseCaseClass uc) => Naming.LowerFirst(uc.Label) + "UseCase";
+    private static string ControllerFile(ControllerClass c) => ToSnakeCase(c.Label[1..]) + "_controller.dart";
+
     private void WriteController(ControllerClass ctrl, string controllersPath)
     {
-        var ucName = ctrl.UseCase?.Label ?? "UseCase";
+        var useCases = ctrl.TargetUseCases.ToList();
+        var imports = useCases.Select(u => "import '../use_cases/" + ToSnakeCase(u.Label) + "_use_case.dart';");
+        var fields = useCases.Select(u => $"  final {u.Label}UseCase _{UseCaseVar(u)};");
+        var ctorParams = useCases.Count > 0
+            ? "{" + string.Join(", ", useCases.Select(u => $"required {u.Label}UseCase {UseCaseVar(u)}")) + "}"
+            : "";
+        var initializer = useCases.Count > 0
+            ? " : " + string.Join(", ", useCases.Select(u => $"_{UseCaseVar(u)} = {UseCaseVar(u)}"))
+            : "";
         var methods = ctrl.Operations.Select(op =>
-        {
-            var invoked = op.InvokedOperation ?? "execute";
-            return $"  void {op.Label}() {{ _useCase.{invoked}(); }}";
-        }).ToList();
+            $"  void {op.Label}() {{ _{UseCaseVar(op.TargetUseCase!)}.{op.Target!.Label}(); }}");
         var content = FillTemplate(LoadTemplate("Controller.txt"),
-            ("UseCaseSnake", ToSnakeCase(ucName)),
-            ("UseCaseName", ucName),
+            ("UseCaseImports", string.Join("\n", imports)),
             ("ControllerName", ctrl.Label),
+            ("Fields", string.Join("\n", fields)),
+            ("ConstructorParams", ctorParams),
+            ("InitializerList", initializer),
             ("Methods", string.Join("\n", methods)));
-        File.WriteAllText(Path.Combine(controllersPath, ToSnakeCase(ctrl.Label.TrimStart('C')) + "_controller.dart"), content);
+        File.WriteAllText(Path.Combine(controllersPath, ControllerFile(ctrl)), content);
     }
 
     private void WriteView(ViewWidget vw, string viewsPath)
@@ -339,7 +344,7 @@ public class FlutterCodeGenerator
         var content = FillTemplate(LoadTemplate("View.txt"),
             ("ViewName", viewName),
             ("ControllerName", controllerName),
-            ("ControllerSnake", ToSnakeCase(controllerName.TrimStart('C'))),
+            ("ControllerSnake", ToSnakeCase(controllerName[1..])),
             ("PresenterName", presenterName),
             ("PresenterSnake", ToSnakeCase(presenterName)),
             ("Fields", string.Join("\n", fields)),
@@ -383,7 +388,7 @@ public class FlutterCodeGenerator
         var presenterImports = ir.Presenters.Select(p => "import 'presenters/" + ToSnakeCase(p.Label) + "_presenter.dart';").ToList();
         var useCaseImports = ir.UseCases.Select(uc => "import 'use_cases/" + ToSnakeCase(uc.Label) + "_use_case.dart';").ToList();
         var controllerImports = ir.Views.Where(v => v.Controller != null).Select(v => v.Controller!)
-            .Distinct().Select(c => "import 'controllers/" + ToSnakeCase(c.Label.TrimStart('C')) + "_controller.dart';").ToList();
+            .Distinct().Select(c => "import 'controllers/" + ControllerFile(c) + "';").ToList();
         var viewImports = ir.Views.Select(v => "import 'views/" + ToSnakeCase(v.Label) + "_view.dart';").ToList();
         var allServices = ir.UseCases.SelectMany(u => u.Services).DistinctBy(s => s.Label).ToList();
         var serviceProxyImports = allServices.Select(s => "import 'services/" + ServiceProxyFile(s) + "';").ToList();
@@ -420,9 +425,8 @@ public class FlutterCodeGenerator
         {
             var c = v.Controller!;
             var ctrlVar = char.ToLowerInvariant(c.Label[0]) + c.Label[1..];
-            var uc = c.UseCase;
-            var ucVar = uc != null ? UcVar(uc) : firstUcVar;
-            return "      _" + ctrlVar + " = " + c.Label + "(useCase: " + ucVar + "!);";
+            var args = c.TargetUseCases.Select(u => UseCaseVar(u) + ": " + UcVar(u) + "!");
+            return "      _" + ctrlVar + " = " + c.Label + "(" + string.Join(", ", args) + ");";
         }).ToList();
 
         var viewTiles = ir.Presenters

@@ -9,6 +9,5 @@ class StartUseCase {
   StartUseCase({ required PMainMenu pMainMenu }) : _pMainMenu = pMainMenu;
 
   void execute() {}
-  void handleClose() {}
-  void handleFindOrder() {}
+  void handleApplication() {}
 }

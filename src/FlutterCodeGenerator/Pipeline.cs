@@ -48,7 +48,9 @@ public static class Pipeline
         if (!result.Success)
             return result;
 
-        var irModel = new RslToIrTranslator().Translate(useCases, notions);
+        var translator = new RslToIrTranslator();
+        var irModel = translator.Translate(useCases, notions);
+        result.Warnings.AddRange(translator.Warnings);
         result.Ir = irModel;
 
         Directory.CreateDirectory(outputFolder);
@@ -91,7 +93,11 @@ public static class Pipeline
         var result = new PipelineResult();
         var (useCases, notions) = Parse(text, fileName, result.Errors);
         if (result.Success)
-            result.Ir = new RslToIrTranslator().Translate(useCases.ToList(), notions.ToList());
+        {
+            var translator = new RslToIrTranslator();
+            result.Ir = translator.Translate(useCases.ToList(), notions.ToList());
+            result.Warnings.AddRange(translator.Warnings);
+        }
         return result;
     }
 

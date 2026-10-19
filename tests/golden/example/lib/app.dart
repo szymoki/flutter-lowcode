@@ -85,16 +85,16 @@ class _AppState extends State<App> {
       _showOrderListUseCase = ShowOrderListUseCase(pOrderListWindow: pOrderListWindow, orderList: orderList);
       _addOrderUseCase = AddOrderUseCase(pAddOrderForm: pAddOrderForm, pOrderSuccessMessage: pOrderSuccessMessage, pOrderErrorMessage: pOrderErrorMessage, order: order);
       _deleteOrderUseCase = DeleteOrderUseCase(pDeleteConfirmationMessage: pDeleteConfirmationMessage, pOrderDeletedMessage: pOrderDeletedMessage, order: order);
-            _cMainMenu = CMainMenu(useCase: _startUseCase!);
-      _cOrderSearchForm = COrderSearchForm(useCase: _findOrderUseCase!);
-      _cOrderWindow = COrderWindow(useCase: _findOrderUseCase!);
-      _cSearchErrorMessage = CSearchErrorMessage(useCase: _findOrderUseCase!);
-      _cOrderListWindow = COrderListWindow(useCase: _showOrderListUseCase!);
-      _cAddOrderForm = CAddOrderForm(useCase: _addOrderUseCase!);
-      _cOrderSuccessMessage = COrderSuccessMessage(useCase: _addOrderUseCase!);
-      _cOrderErrorMessage = COrderErrorMessage(useCase: _addOrderUseCase!);
-      _cDeleteConfirmationMessage = CDeleteConfirmationMessage(useCase: _deleteOrderUseCase!);
-      _cOrderDeletedMessage = COrderDeletedMessage(useCase: _deleteOrderUseCase!);
+            _cMainMenu = CMainMenu(findOrderUseCase: _findOrderUseCase!);
+      _cOrderSearchForm = COrderSearchForm(findOrderUseCase: _findOrderUseCase!);
+      _cOrderWindow = COrderWindow(findOrderUseCase: _findOrderUseCase!);
+      _cSearchErrorMessage = CSearchErrorMessage(findOrderUseCase: _findOrderUseCase!, showOrderListUseCase: _showOrderListUseCase!);
+      _cOrderListWindow = COrderListWindow(showOrderListUseCase: _showOrderListUseCase!, addOrderUseCase: _addOrderUseCase!);
+      _cAddOrderForm = CAddOrderForm(addOrderUseCase: _addOrderUseCase!);
+      _cOrderSuccessMessage = COrderSuccessMessage(addOrderUseCase: _addOrderUseCase!);
+      _cOrderErrorMessage = COrderErrorMessage(addOrderUseCase: _addOrderUseCase!, deleteOrderUseCase: _deleteOrderUseCase!);
+      _cDeleteConfirmationMessage = CDeleteConfirmationMessage(deleteOrderUseCase: _deleteOrderUseCase!);
+      _cOrderDeletedMessage = COrderDeletedMessage(deleteOrderUseCase: _deleteOrderUseCase!);
       WidgetsBinding.instance.addPostFrameCallback((_) => setState(() {}));
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),

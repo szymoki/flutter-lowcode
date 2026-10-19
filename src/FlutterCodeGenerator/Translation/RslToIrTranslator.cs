@@ -5,6 +5,8 @@ namespace FlutterCodeGenerator.Translation;
 
 public class RslToIrTranslator
 {
+    public List<string> Warnings { get; } = new();
+
     private static string ToPascalCase(string s) => Naming.Pascal(s);
 
     private static string ToCamelCase(string s) => Naming.Camel(s);
@@ -108,7 +110,29 @@ public class RslToIrTranslator
                 ProcessScenario(scenario, ir, ctx);
         }
 
+        foreach (var ucc in ir.UseCases)
+            MakeOperationLabelsUnique(ucc);
+        Warnings.AddRange(ctx.Warnings);
         return ir;
+    }
+
+    /// <summary>
+    /// Ten sam wyzwalacz w różnych widokach jednego przypadku użycia (np. „close” w OrderWindow
+    /// i w SearchErrorMessage) daje różne operacje o tej samej nazwie. Dart nie ma przeciążania,
+    /// więc kolidujące operacje dostają w nazwie widok źródłowy (D3.2).
+    /// </summary>
+    private static void MakeOperationLabelsUnique(UseCaseClass ucc)
+    {
+        foreach (var group in ucc.Operations.GroupBy(o => o.Label).Where(g => g.Count() > 1).ToList())
+        {
+            var index = 1;
+            foreach (var op in group)
+            {
+                var suffix = op.SourceView?.Label ?? index.ToString();
+                op.Label += suffix;
+                index++;
+            }
+        }
     }
 
     private void ProcessUseCaseClause(UseCase uc, IrModel ir, TranslationContext ctx)
@@ -221,7 +245,7 @@ public class RslToIrTranslator
         if (vw == null)
         {
             vw = new ViewWidget { Label = label };
-            var ctrl = new ControllerClass { Label = "C" + label, UseCase = ctx.CurrentUCC };
+            var ctrl = new ControllerClass { Label = "C" + label };
             var pres = new PresenterClass { Label = "P" + label };
             vw.Controller = ctrl;
             vw.Presenter = pres;
@@ -267,19 +291,40 @@ public class RslToIrTranslator
 
     private void ProcessSelectSentence(string actor, string notion, bool isInitial, IrModel ir, TranslationContext ctx)
     {
-        var trigger = new Trigger { Label = ToCamelCase(notion) };
-        ctx.CurrentVF?.Triggers.Add(trigger);
-
-        var cop = new COperation { Label = "on" + ToPascalCase(notion) };
-        ctx.CurrentVF?.Controller?.Operations.Add(cop);
-
-        var ucOp = new UCOperation { Label = "handle" + ToPascalCase(notion), IsInitial = isInitial };
+        // Operacja należy do przypadku użycia, w którego scenariuszu stoi zdanie (D3.1),
+        // a przycisk – do widoku wyświetlonego jako ostatni.
+        var ucOp = new UCOperation
+        {
+            Label = "handle" + ToPascalCase(notion),
+            IsInitial = isInitial,
+            SourceView = ctx.CurrentVF,
+            TriggerNotion = notion
+        };
         ctx.CurrentUCC?.Operations.Add(ucOp);
-        cop.InvokedOperation = ucOp.Label;
         ctx.CurrentUCO = ucOp;
+
+        if (ctx.CurrentVF != null)
+            AddTrigger(ctx.CurrentVF, notion, ucOp, ctx.CurrentUCC, ctx);
 
         if (isInitial)
             ProcessScheduledInvocations(ir, ctx);
+    }
+
+    /// <summary>Dodaje do widoku wyzwalacz i operację kontrolera wskazującą operację przypadku użycia.</summary>
+    private static void AddTrigger(ViewWidget view, string notion, UCOperation target, UseCaseClass? targetUseCase, TranslationContext ctx)
+    {
+        var triggerLabel = ToCamelCase(notion);
+        if (!view.Triggers.Any(t => t.Label == triggerLabel))
+            view.Triggers.Add(new Trigger { Label = triggerLabel });
+
+        var ctrl = view.Controller!;
+        var copLabel = "on" + ToPascalCase(notion);
+        var existing = ctrl.Operations.FirstOrDefault(o => o.Label == copLabel);
+        if (existing == null)
+            ctrl.Operations.Add(new COperation { Label = copLabel, Target = target, TargetUseCase = targetUseCase });
+        else if (existing.Target != target)
+            ctx.Warnings.Add($"Wyzwalacz „{notion}” w widoku {view.Label} wskazuje już operację {existing.TargetUseCase?.Label}.{existing.Target?.Label}; " +
+                             $"pominięto drugie przypisanie do {targetUseCase?.Label}.{target.Label}.");
     }
 
     private void ProcessSystemDataSentence(PredicateType type, string notion, IrModel ir, TranslationContext ctx)

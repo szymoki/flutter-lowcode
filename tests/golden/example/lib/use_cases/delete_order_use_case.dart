@@ -13,7 +13,7 @@ class DeleteOrderUseCase {
       _order = order;
 
   void execute() {}
-  void handleClose() {}
+  void handleDeleteOrder() {}
   void handleDelete() {}
   void handleOk() {}
   void handleCancel() {}

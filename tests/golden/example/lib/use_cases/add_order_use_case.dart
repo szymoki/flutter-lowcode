@@ -16,10 +16,10 @@ class AddOrderUseCase {
       _order = order;
 
   void execute() {}
-  void handleClose() {}
+  void handleAddOrder() {}
   void handleAdd() {}
   void handleOk() {}
   void handleCancel() {}
+  void handleClose() {}
   void handleCorrect() {}
-  void handleDeleteOrder() {}
 }

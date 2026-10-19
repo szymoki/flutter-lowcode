@@ -17,5 +17,9 @@ public class UCOperation
     public bool IsInvoking { get; set; }
     public string? ReturnTo { get; set; }
     public UCOperation? Parent { get; set; }
+    /// <summary>Widok, którego wyzwalacz uruchamia operację (null dla operacji bez widoku, np. execute).</summary>
+    public ViewWidget? SourceView { get; set; }
+    /// <summary>Nazwa wyzwalacza RSL, z której powstała etykieta operacji („close”).</summary>
+    public string? TriggerNotion { get; set; }
     public List<Instruction> Instructions { get; } = new();
 }

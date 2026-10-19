@@ -1,10 +1,10 @@
 // Generated from IR
-import '../use_cases/start_use_case.dart';
+import '../use_cases/find_order_use_case.dart';
 
 class CMainMenu {
-  final StartUseCase _useCase;
+  final FindOrderUseCase _findOrderUseCase;
 
-  CMainMenu({required StartUseCase useCase}) : _useCase = useCase;
+  CMainMenu({required FindOrderUseCase findOrderUseCase}) : _findOrderUseCase = findOrderUseCase;
 
-  void onFindOrder() { _useCase.handleFindOrder(); }
+  void onFindOrder() { _findOrderUseCase.handleFindOrder(); }
 }

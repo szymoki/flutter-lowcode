@@ -10,7 +10,7 @@ class ShowOrderListUseCase {
       _orderList = orderList;
 
   void execute() {}
+  void handleShowOrderList() {}
   void handleClose() {}
   void handleOrderList() {}
-  void handleAddOrder() {}
 }

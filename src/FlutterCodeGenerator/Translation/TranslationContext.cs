@@ -15,4 +15,5 @@ public class TranslationContext
     public Condition? CurrentCondition { get; set; }
     public Dictionary<string, ViewWidget> LabelToVF { get; } = new();
     public List<(string UcName, Action Attach)> ScheduledInvocations { get; } = new();
+    public List<string> Warnings { get; } = new();
 }

@@ -2,9 +2,9 @@
 import '../use_cases/add_order_use_case.dart';
 
 class CAddOrderForm {
-  final AddOrderUseCase _useCase;
+  final AddOrderUseCase _addOrderUseCase;
 
-  CAddOrderForm({required AddOrderUseCase useCase}) : _useCase = useCase;
+  CAddOrderForm({required AddOrderUseCase addOrderUseCase}) : _addOrderUseCase = addOrderUseCase;
 
-  void onAdd() { _useCase.handleAdd(); }
+  void onAdd() { _addOrderUseCase.handleAdd(); }
 }

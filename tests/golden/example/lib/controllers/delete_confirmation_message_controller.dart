@@ -2,9 +2,9 @@
 import '../use_cases/delete_order_use_case.dart';
 
 class CDeleteConfirmationMessage {
-  final DeleteOrderUseCase _useCase;
+  final DeleteOrderUseCase _deleteOrderUseCase;
 
-  CDeleteConfirmationMessage({required DeleteOrderUseCase useCase}) : _useCase = useCase;
+  CDeleteConfirmationMessage({required DeleteOrderUseCase deleteOrderUseCase}) : _deleteOrderUseCase = deleteOrderUseCase;
 
-  void onDelete() { _useCase.handleDelete(); }
+  void onDelete() { _deleteOrderUseCase.handleDelete(); }
 }

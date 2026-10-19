@@ -19,8 +19,9 @@ class FindOrderUseCase {
       _order = order;
 
   void execute() {}
-  void handleClose() {}
+  void handleFindOrder() {}
   void handleSearch() {}
+  void handleCloseOrderWindow() {}
   void handleCancel() {}
-  void handleShowOrderList() {}
+  void handleCloseSearchErrorMessage() {}
 }
