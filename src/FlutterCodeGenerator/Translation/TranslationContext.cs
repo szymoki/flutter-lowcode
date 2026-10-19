@@ -24,6 +24,10 @@ public class TranslationContext
     public Dictionary<string, UseCaseClass> UseCaseByName { get; } = new(StringComparer.OrdinalIgnoreCase);
     /// <summary>Pierwsze zdanie scenariusza głównego bieżącego przypadku użycia.</summary>
     public Sentence? FirstSentence { get; set; }
+    /// <summary>Pojęcia sprawdzane zdaniem &lt;check&gt; w bieżącym przypadku użycia.</summary>
+    public List<string> CheckedNotions { get; } = new();
+    /// <summary>Warunki wartości (pojęcie, wartość) z bieżącego przypadku użycia.</summary>
+    public List<(string Notion, string Value)> ValueConditions { get; } = new();
     public List<string> Warnings { get; } = new();
     public List<string> Errors { get; } = new();
 }

@@ -99,11 +99,10 @@ public class FlutterCodeGenerator
             WriteDataAggregate(agg, modelsPath);
 
         foreach (var si in ir.Services)
-        {
-            if (si.Methods.Any(m => m.Type == PredicateType.Check))
-                WriteCheckResultStub(CheckResultClass(si), modelsPath);
             WriteServiceInterface(si, servicesPath, ir);
-        }
+
+        foreach (var e in ir.ViewModel.Enums)
+            WriteEnum(e, modelsPath);
 
         foreach (var pres in ir.Presenters)
             WritePresenter(pres, presentersPath, ir);
@@ -176,11 +175,11 @@ public class FlutterCodeGenerator
         File.WriteAllText(Path.Combine(modelsPath, ToSnakeCase(agg.Label) + ".dart"), objectContent);
     }
 
-    private void WriteCheckResultStub(string className, string modelsPath)
+    private void WriteEnum(EnumUnion e, string modelsPath)
     {
-        var path = Path.Combine(modelsPath, ToSnakeCase(className) + ".dart");
-        if (File.Exists(path)) return;
-        File.WriteAllText(path, "// Generated from IR - stub for check result\nclass " + className + " {}\n");
+        var members = string.Join(", ", e.Elements.Select(v => Naming.EnumMember(v.Label)));
+        var content = "// Generated from IR\nenum " + e.Label + " { " + members + " }\n";
+        File.WriteAllText(Path.Combine(modelsPath, ToSnakeCase(e.Label) + ".dart"), content);
     }
 
     private void WriteServiceInterface(ServiceInterface si, string servicesPath, IrModel ir)

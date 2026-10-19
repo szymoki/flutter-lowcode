@@ -1,2 +1,2 @@
-// Generated from IR - stub for check result
-class OrderSearchCheckResult {}
+// Generated from IR
+enum OrderSearchCheckResult { valid, invalid }

@@ -40,6 +40,8 @@ public class Trigger
 public class EnumUnion
 {
     public string Label { get; set; } = "";
+    /// <summary>Pojęcie RSL, którego wynik sprawdzenia opisuje enum.</summary>
+    public string NotionName { get; set; } = "";
     public List<EnumValue> Elements { get; } = new();
 }
 

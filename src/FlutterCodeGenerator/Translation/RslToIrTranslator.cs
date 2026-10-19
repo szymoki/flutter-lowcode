@@ -105,7 +105,9 @@ public class RslToIrTranslator
             ProcessMainScenario(uc, ir, ctx);
             foreach (var scenario in uc.Scenarios)
                 ProcessScenario(scenario, ir, ctx);
+            CollectCheckResults(ir, ctx);
         }
+        EnsureCheckResultEnums(ir, ctx);
 
         foreach (var ucc in ir.UseCases)
             MakeOperationLabelsUnique(ucc);
@@ -161,6 +163,49 @@ public class RslToIrTranslator
         }
     }
 
+    /// <summary>
+    /// Wartości warunków dotyczących pojęcia sprawdzanego w tym samym przypadku użycia
+    /// (<c>[order ? OK]</c>, <c>[order ? notOK]</c>) tworzą enum <c>OrderCheckResult</c>.
+    /// Pojęcie sprawdzane w kilku przypadkach użycia ma jeden enum z sumą wartości.
+    /// </summary>
+    private static void CollectCheckResults(IrModel ir, TranslationContext ctx)
+    {
+        foreach (var notion in ctx.CheckedNotions.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var enumUnion = GetOrCreateCheckResultEnum(notion, ir);
+            var values = ctx.ValueConditions
+                .Where(c => string.Equals(c.Notion.Trim(), notion.Trim(), StringComparison.OrdinalIgnoreCase))
+                .Select(c => c.Value);
+            foreach (var value in values)
+                if (!enumUnion.Elements.Any(e => Naming.EnumMember(e.Label) == Naming.EnumMember(value)))
+                    enumUnion.Elements.Add(new EnumValue { Label = value });
+        }
+    }
+
+    private static EnumUnion GetOrCreateCheckResultEnum(string notion, IrModel ir)
+    {
+        var label = ToPascalCase(notion) + "CheckResult";
+        var enumUnion = ir.ViewModel.Enums.FirstOrDefault(e => e.Label == label);
+        if (enumUnion == null)
+        {
+            enumUnion = new EnumUnion { Label = label, NotionName = notion.Trim() };
+            ir.ViewModel.Enums.Add(enumUnion);
+        }
+        return enumUnion;
+    }
+
+    private static void EnsureCheckResultEnums(IrModel ir, TranslationContext ctx)
+    {
+        foreach (var si in ir.Services.Where(s => s.Methods.Any(m => m.Type == PredicateType.Check)))
+        {
+            var enumUnion = GetOrCreateCheckResultEnum(si.NotionName, ir);
+            if (enumUnion.Elements.Count > 0) continue;
+            enumUnion.Elements.Add(new EnumValue { Label = "ok" });
+            ctx.Warnings.Add($"Pojęcie „{si.NotionName}” jest sprawdzane, ale żaden warunek nie podaje wartości wyniku; " +
+                             $"{enumUnion.Label} ma jedną wartość „ok”.");
+        }
+    }
+
     private void ProcessUseCaseClause(UseCase uc, IrModel ir, TranslationContext ctx)
     {
         var ucc = ctx.UseCaseByName[uc.Name.Trim()];
@@ -174,6 +219,8 @@ public class RslToIrTranslator
         ctx.CurrentDAP.Clear();
         ctx.CurrentDAD.Clear();
         ctx.PendingEditable.Clear();
+        ctx.CheckedNotions.Clear();
+        ctx.ValueConditions.Clear();
         ctx.CurrentUCO = ucc.Operations[0];
 
         if (uc.MainScenario.Preconditions.Count > 0)
@@ -195,6 +242,8 @@ public class RslToIrTranslator
                 continue;
             else if (cond is ValueCondition vc)
             {
+                ctx.CheckedNotions.Add(vc.Notion);
+                ctx.ValueConditions.Add((vc.Notion, vc.Value));
                 var si = GetOrCreateServiceInterface(vc.Notion, ir);
                 var sop = new SOperation { Label = "validate" + ToPascalCase(vc.Notion), Type = PredicateType.Check };
                 si.Methods.Add(sop);
@@ -254,6 +303,8 @@ public class RslToIrTranslator
         }
         else if (sent is CondSentence cond)
         {
+            foreach (var vc in cond.Conditions.OfType<ValueCondition>())
+                ctx.ValueConditions.Add((vc.Notion, vc.Value));
             var exprs = cond.Conditions.Select(c =>
             {
                 if (c is ValueCondition vc)
@@ -452,6 +503,8 @@ public class RslToIrTranslator
         var si = GetOrCreateServiceInterface(notion, ir);
         // <read> zwraca obiekt pojęcia, więc jego klasa modelu musi istnieć, nawet bez definicji Data.
         var readAggregate = type == PredicateType.Read ? GetOrCreateDataAggregate(notion, ir) : null;
+        if (type == PredicateType.Check)
+            ctx.CheckedNotions.Add(notion);
         var sop = new SOperation
         {
             Label = type.ToString().ToLowerInvariant() + ToPascalCase(notion),

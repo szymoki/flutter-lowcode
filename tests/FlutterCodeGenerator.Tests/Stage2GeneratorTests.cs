@@ -20,7 +20,7 @@ public class Stage2GeneratorTests
         using var p = GeneratedProject.FromExample();
         Assert.True(File.Exists(p.Lib("models/order_search_check_result.dart")));
         Assert.False(File.Exists(p.Lib("models/ordersearch_check_result.dart")));
-        Assert.Contains("class OrderSearchCheckResult", p.Read("models/order_search_check_result.dart"));
+        Assert.Contains("enum OrderSearchCheckResult", p.Read("models/order_search_check_result.dart"));
         Assert.Contains("Future<OrderSearchCheckResult> checkOrderSearch(", p.Read("services/i_order_search.dart"));
     }
 
