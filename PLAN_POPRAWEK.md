@@ -338,3 +338,123 @@ Po zakończeniu dopisz na końcu tego pliku krótki raport. Posłuży do aktuali
 - **D10.2 – `<close> X` ukrywa widok X (`_pX.hide()`) bez ukrywania pozostałych widoków przypadku użycia.** Zdanie odnosi się do widoku wyświetlonego wcześniej. Jeśli takiego nie ma, zdanie jest pomijane z ostrzeżeniem. Miejsce: `RslToIrTranslator.ProcessCloseSentence`, `UseCaseWriter`.
 - **D10.3 – Pole `date`: `TextField` tylko do odczytu z `showDatePicker`**, zapisujące datę jako `RRRR-MM-DD` (konwersja przez `DateTime.tryParse` z D8.3).
 - **D10.4 – Punkt 4 etapu 10 (reguły S1–S8) nie został zrealizowany.** Tabela `tab:kon-semantyka` jest w `praca/rozdzial-implementacja.tex`, którego nie ma w repozytorium ani na maszynie, na której wykonywano plan. Część kontroli semantycznych powstała w etapach 4–5 i 8–10 przy okazji: nieznana etykieta powtórzenia i `rejoin`, nieznany przypadek użycia w `<invoke>` i jego dwukrotna definicja (błędy, kod 1); `<invoke>` przed `<show>`, przypadek wywoływany bez `<select>`, sprawdzenie bez wartości, warunek na niesprawdzanym pojęciu, sprzeczne parametry operacji usługi, nieznane definicje `View`/`Trigger` i `<close>` (ostrzeżenia).
+
+## Raport końcowy
+
+Wykonano 2026-10-19 na gałęzi `poprawki-translatora` (od `2fc4a4c`). Na maszynie nie było .NET, więc zainstalowano .NET SDK 8.0.426 w `~/.dotnet` (skrypt `dotnet-install.sh`, bez uprawnień administratora).
+
+### 1. Etapy i commity
+
+| Etap | Commit | Zakres |
+|---|---|---|
+| 0 | `21f4557` | `Pipeline`, projekt testów xUnit, wzorzec golden |
+| 1 | `1cafa99` | warunki wstępne, negacja, błędy składni (kod 1), kolejność plików, kody 1/2 |
+| 2 | `6d23233` | typy usług, nazwy z `NotionName`, `copyWith`, importy, pubspec, zaślepki, usuwanie starych plików |
+| 3 | `d8643d9` | metody przypadków użycia z IR, kontrolery z wieloma przypadkami użycia |
+| 4 | `54c341c` | migawki etykiet, scenariusze alternatywne, `rejoin` |
+| 5 | `6ea4f90` | `<invoke>`, operacje wejściowe, niezależność od kolejności |
+| 6 | `59969e7` | dane prezentowane i edytowane, kolekcje |
+| 7 | `025530d` | wyniki sprawdzenia jako `enum` |
+| 8 | `2f0f107` | ciała metod przypadków użycia, dane z formularza |
+| 9 | `f7ae091` | start od `Start`, `IndexedStack`, powrót z wywołanych przypadków użycia |
+| 10 | `a91ee80` | etykiety `View`/`Trigger`, `<close>`, `date`; punkt 4 (S1–S8) pominięty – D10.4 |
+| 11 | `dcdfc46` | porządki, README, zrzuty ekranu |
+
+### 2. Ograniczenia, które przestały obowiązywać
+
+Plików `praca/rozdzial-implementacja.tex` (`sec:kon-ograniczenia`, `tab:kon-decyzje`) i `praca/rozdzial-rezultaty.tex` nie ma w repozytorium ani na maszynie, więc nie dało się odnieść do ich numeracji. Poniżej ograniczenia z listy w `docs/praca/06_weryfikacja_ograniczenia_rozwoj.md` (opis stanu z `2fc4a4c`), które warto porównać z listą w pracy:
+
+| Ograniczenie (stan `2fc4a4c`) | Stan teraz |
+|---|---|
+| Logika przepływu nie trafia do Darta, metody przypadków użycia puste | usunięte (etap 8) |
+| Nawigacja: ekran startowy to lista widoków | usunięte (etap 9); lista jako tryb diagnostyczny |
+| Warunki wstępne gubione w `VisitMainscenario` | usunięte (etap 1) |
+| Negacja w warunkach niewykrywana | usunięte (etap 1) |
+| Krotność `[pojęcie]` ignorowana | usunięte (etap 6) |
+| Podwójne `Future` w usługach | usunięte (etap 2) |
+| `<invoke>`, `<close>`, systemowe `<invoke>` bez skutku | usunięte (etapy 5, 9, 10) |
+| `rejoin` działa częściowo | usunięte (etapy 4, 9) |
+| Definicje `View`/`Trigger` nieużywane | usunięte (etap 10); typ widoku tylko zapisany w IR |
+| Wyzwalacze przypisywane do widoków innych przypadków użycia (13/20) | usunięte (etapy 3–5); 20/20 |
+| Typ `date` jako zwykłe pole tekstowe | usunięte (etap 10) |
+| Brak walidacji semantycznej i czytelnych błędów | częściowo: błędy składni z plikiem, wierszem i kolumną oraz kod 1; część kontroli semantycznych (D10.4); reguły S1–S8 niezrealizowane |
+| Brak testów automatycznych | usunięte: 68 testów xUnit (IR, wygenerowany kod, golden) |
+| Martwy `FlutterModuleGenerator.cs`, podwójna gramatyka | usunięte (etap 11) |
+| Pliki `find_order.txt`, `off_examples/` spoza gramatyki | bez zmian (poza zakresem planu) |
+
+Uwaga do pracy: stan wyjściowy **nie** był wolny od błędów kompilacji Darta, jak zakładał opis „48 plików Dart, które się budują”. `flutter analyze lib` dla `2fc4a4c` zgłaszał 2 błędy (`undefined_class`: `Order` bez importu w `models/order_list.dart`) i 15 ostrzeżeń `unused_field`. `flutter build web` przechodził tylko dlatego, że `order_list.dart` nie był importowany przez nic, co trafia do aplikacji.
+
+Nowe ograniczenia lub zachowania, które warto opisać w pracy:
+- dane z warunku kontekstowego (`Delete order`: `{…; order}`) trzeba przekazać przez `setOrder`; specyfikacja nie ma zdania wyboru pojedynczego zamówienia z listy, więc `delete` bez tego kończy się błędem w czasie działania (D8.4),
+- zaślepki usług zgłaszają `UnimplementedError`, dopóki programista ich nie uzupełni, więc pełny przebieg w przeglądarce wymaga implementacji usług (w weryfikacji uzupełniono je lokalnie, D9.6),
+- `docker compose run --rm generator` uruchamia generator jako root, więc pliki w `flutter_web/` mogą zmienić właściciela. Przy weryfikacji uruchomiono go z `--user "$(id -u):$(id -g)"`. `docker-compose.yml` nie był zmieniany.
+
+### 3. Liczby dla `example.txt`
+
+| Miara | `2fc4a4c` | teraz |
+|---|---|---|
+| Pliki Dart w `lib/` | 48 | 49 (doszedł `presenters/view_presenter.dart`) |
+| Wiersze Dart w `lib/` | 1 235 | 1 371 |
+| Zgodność wyzwalaczy z tabelą akceptacji | 13/20 | 20/20 |
+| `flutter analyze lib` | 2 błędy, 15 ostrzeżeń | brak problemów |
+| Testy (`dotnet test src`) | – | 68/68 |
+
+Podział plików teraz: `models` 5 (3 klasy, 2 enumy), `views` 10, `controllers` 10, `presenters` 11 (10 + klasa bazowa), `use_cases` 5, `services` 6 (3 interfejsy, 3 zaślepki), `main.dart`, `app.dart`.
+
+Log translatora (`dotnet run --project src/FlutterCodeGenerator -- examples flutter_web`), kod wyjścia **0**, brak ostrzeżeń i błędów:
+
+```
+[Parser .txt structure] File: example.txt
+  Parsed text length: 1642 | preview: Use caseStartMain scenario00:User<select>application01:System<show>mainmenu02:User<invoke>Showorderlist,Findorder,Addord...
+  AST: UseCases=5, Notions=3
+    UseCase: Start | MainScenario sentences=3, scenarios=0
+      - SVO 00 User Select application
+      - SVO 01 System Show main menu
+      - SVO 02 User InvokePredicate
+    UseCase: Find order | MainScenario sentences=9, scenarios=2
+      - SVO 00 User Select find order
+      - SVO 01 System Show order search form
+      - SVO 02 User Enter order search
+      - SVO 03 User Select search
+      - SVO 04 System CheckPredicate
+    UseCase: Show order list | MainScenario sentences=4, scenarios=1
+      - SVO 00 User Select show order list
+      - SVO 01 System ReadPredicate
+      - SVO 02 System Show order list window
+      - SVO 03 User Select close
+    UseCase: Add order | MainScenario sentences=9, scenarios=3
+      - SVO 00 User Select add order
+      - SVO 01 System Show add order form
+      - SVO 02 User Enter order
+      - SVO 03 User Select add
+      - SVO 04 System CheckPredicate
+    UseCase: Delete order | MainScenario sentences=6, scenarios=1
+      - SVO 00 User Select delete order
+      - SVO 01 System Show delete confirmation message
+      - SVO 02 User Select delete
+      - SVO 03 System DeletePredicate
+      - SVO 04 System Show order deleted message
+    Notion Data: order | attrs=number:integer, title:text, dates:text
+    Notion Data: order list | attrs=orders:order
+    Notion Data: order search | attrs=title:text
+
+Wygenerowano aplikację Flutter w: /home/szymon/Dokumenty/flutter-lowcode/flutter_web
+```
+
+Specyfikacja z błędem składniowym (`tests/specs/syntax_error.txt`, `<shows>`), kod wyjścia **1**:
+
+```
+Błąd: syntax_error.txt:3:12: token recognition error at: '<shows'
+Błąd: syntax_error.txt:3:18: token recognition error at: '>'
+Błąd: syntax_error.txt:3:20: mismatched input 'add' expecting {'<show>', '<close>', '<read>', '<update>', '<delete>', '<check>', '<execute>', '<invoke>'}
+```
+
+Bez argumentów: sposób użycia na stderr, kod wyjścia **2**.
+
+Docker: `docker compose run --rm --user "$(id -u):$(id -g)" generator` – kod 0, wynik identyczny z `flutter_web/` w repozytorium. `docker compose up --build flutter_web` – obraz zbudowany (`flutter build web --release`, „✓ Built build/web”), nginx odpowiada na `http://localhost:8787` kodem 200. Strona otwarta w Chrome (headless, 1280×900) startuje od widoku `MainMenu` z przyciskami `showOrderList`, `findOrder`, `addOrder`.
+
+Zrzuty ekranu w `screenshots/` wykonano testem widgetów Fluttera (fonty Roboto z SDK, 1280×900) na kopii aplikacji z przykładowymi danymi w zaślepkach usług. Pliki 01–06 mają te same nazwy co wcześniej (01 to teraz tryb diagnostyczny z listą widoków, 02 – ekran startowy). Doszły 07 (`Add order`, wynik `ok`) i 08 (wynik `notOk`).
+
+### 4. Decyzje
+
+Wszystkie wpisy są w sekcji „Decyzje” powyżej: D0.1–D0.2, D1.1–D1.3, D2.1–D2.3, D3.1–D3.3, D4.1–D4.4, D5.1–D5.3, D6.1–D6.4, D7.1–D7.2, D8.1–D8.7, D9.1–D9.6, D10.1–D10.4.
