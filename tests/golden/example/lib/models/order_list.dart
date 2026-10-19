@@ -2,13 +2,13 @@
 import 'order.dart';
 
 class OrderList {
-  final Order orders;
+  final List<Order> orders;
 
   const OrderList({
     required this.orders
   });
 
-  OrderList copyWith({Order? orders}) {
+  OrderList copyWith({List<Order>? orders}) {
     return OrderList(
       orders: orders ?? this.orders
     );

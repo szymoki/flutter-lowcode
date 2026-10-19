@@ -11,6 +11,8 @@ public class TranslationContext
     public List<DataAggregate> CurrentDAD { get; } = new();
     /// <summary>Agregaty z warunków kontekstowych przypadku użycia; dostępne w całym przypadku użycia.</summary>
     public List<DataAggregate> ContextDA { get; } = new();
+    /// <summary>Dane z &lt;enter&gt; przed pierwszym &lt;show&gt; przypadku użycia; trafiają do następnego widoku.</summary>
+    public List<DataAggregate> PendingEditable { get; } = new();
     public string CurrentLabel { get; set; } = "";
     public UCOperation? CurrentUCO { get; set; }
     public Condition? CurrentCondition { get; set; }

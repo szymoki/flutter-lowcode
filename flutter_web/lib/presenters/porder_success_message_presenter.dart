@@ -1,16 +1,13 @@
 // Generated from IR
 import 'package:flutter/foundation.dart';
-import '../models/order.dart';
 
 
 class POrderSuccessMessage extends ChangeNotifier {
   bool _isVisible = false;
   bool get isVisible => _isVisible;
-  Order? _order;
-  Order? get order => _order;
 
-  void showOrderSuccessMessage(Order? order) {
-        if (order != null) _order = order;
+
+  void showOrderSuccessMessage() {
     notifyListeners();
   }
 

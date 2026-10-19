@@ -14,9 +14,7 @@ class OrderErrorMessageView extends StatefulWidget {
 }
 
 class _OrderErrorMessageViewState extends State<OrderErrorMessageView> {
-  final _numberController = TextEditingController();
-  final _titleController = TextEditingController();
-  final _datesController = TextEditingController();
+
 
   @override
   void initState() {
@@ -28,9 +26,7 @@ class _OrderErrorMessageViewState extends State<OrderErrorMessageView> {
 
   @override
   void dispose() {
-    _numberController.dispose();
-    _titleController.dispose();
-    _datesController.dispose();
+
     super.dispose();
   }
 
@@ -43,12 +39,8 @@ class _OrderErrorMessageViewState extends State<OrderErrorMessageView> {
           appBar: AppBar(title: const Text('OrderErrorMessage')),
           body: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: ListView(
               children: [
-                Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: _numberController, decoration: const InputDecoration(labelText: 'Number', border: OutlineInputBorder()), keyboardType: TextInputType.number,)),
-                Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: _titleController, decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder()),)),
-                Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: _datesController, decoration: const InputDecoration(labelText: 'Dates', border: OutlineInputBorder()),)),
                 ElevatedButton(onPressed: () => widget.controller.onClose(), child: const Text('close')),
                 ElevatedButton(onPressed: () => widget.controller.onCorrect(), child: const Text('correct')),
               ],

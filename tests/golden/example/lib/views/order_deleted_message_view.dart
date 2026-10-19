@@ -39,8 +39,7 @@ class _OrderDeletedMessageViewState extends State<OrderDeletedMessageView> {
           appBar: AppBar(title: const Text('OrderDeletedMessage')),
           body: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: ListView(
               children: [
                 ElevatedButton(onPressed: () => widget.controller.onOk(), child: const Text('ok')),
               ],

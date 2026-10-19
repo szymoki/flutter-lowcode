@@ -39,8 +39,7 @@ class _MainMenuViewState extends State<MainMenuView> {
           appBar: AppBar(title: const Text('MainMenu')),
           body: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: ListView(
               children: [
                 ElevatedButton(onPressed: () => widget.controller.onShowOrderList(), child: const Text('showOrderList')),
                 ElevatedButton(onPressed: () => widget.controller.onFindOrder(), child: const Text('findOrder')),

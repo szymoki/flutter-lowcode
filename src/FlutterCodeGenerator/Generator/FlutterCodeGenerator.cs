@@ -65,9 +65,17 @@ public class FlutterCodeGenerator
 
     private HashSet<string> AggregateLabels = new();
 
+    private static string ItemDartType(DataItem item) =>
+        item.IsList ? $"List<{DartType(item.TypeKind)}>" : DartType(item.TypeKind);
+
+    private static string ItemVar(DataItem item) => Naming.LowerFirst(item.Label);
+
+    private Dictionary<string, DataAggregate> AggregatesByLabel = new();
+
     public void Generate(IrModel ir, string outputFolder)
     {
         AggregateLabels = ir.ViewModel.Aggregates.Select(a => a.Label).ToHashSet();
+        AggregatesByLabel = ir.ViewModel.Aggregates.ToDictionary(a => a.Label);
         var libPath = Path.Combine(outputFolder, "lib");
         Directory.CreateDirectory(libPath);
 
@@ -134,23 +142,12 @@ public class FlutterCodeGenerator
 
     private void WriteDataAggregate(DataAggregate agg, string modelsPath)
     {
-        var isList = agg.Items.Count == 1 && agg.Items[0].TypeKind == agg.Label;
-        if (isList)
-        {
-            var itemType = agg.Items[0].TypeKind;
-            var content = FillTemplate(LoadTemplate("ModelList.txt"),
-                ("ClassName", agg.Label),
-                ("ItemType", DartType(itemType)));
-            File.WriteAllText(Path.Combine(modelsPath, ToSnakeCase(agg.Label) + ".dart"), content);
-            return;
-        }
-
-        var fields = agg.Items.Select(i => $"  final {DartType(i.TypeKind)} {char.ToLowerInvariant(i.Label[0]) + i.Label[1..]};").ToList();
+        var fields = agg.Items.Select(i => $"  final {ItemDartType(i)} {char.ToLowerInvariant(i.Label[0]) + i.Label[1..]};").ToList();
         var ctorParams = agg.Items.Select(i => "required this." + char.ToLowerInvariant(i.Label[0]) + i.Label[1..]).ToList();
         var copyParams = agg.Items.Select(i =>
         {
             var name = char.ToLowerInvariant(i.Label[0]) + i.Label[1..];
-            return $"{DartType(i.TypeKind)}? {name}";
+            return $"{ItemDartType(i)}? {name}";
         }).ToList();
         var nestedTypes = agg.Items.Select(i => DartType(i.TypeKind))
             .Where(t => t != agg.Label && AggregateLabels.Contains(t))
@@ -330,17 +327,17 @@ public class FlutterCodeGenerator
         var viewName = vw.Label;
         var controllerName = vw.Controller?.Label ?? "C" + viewName;
         var presenterName = vw.Presenter?.Label ?? "P" + viewName;
-        var editableItems = vw.Data.SelectMany(d => d.Items.Where(i => i.EditableStateItem)).ToList();
-        var fields = editableItems.Select(i =>
-            $"  final _{(char.ToLowerInvariant(i.Label[0]) + i.Label[1..])}Controller = TextEditingController();").ToList();
-        var formFields = editableItems.Select(i => FormFieldWidget(i)).ToList();
+        var editable = EditableFields(vw).ToList();
+        var fields = editable.Select(f => $"  final {f.ControllerVar} = TextEditingController();").ToList();
+        var formFields = editable.Select(f => FormFieldWidget(f.Item, f.ControllerVar)).ToList();
+        var dataWidgets = vw.Data.SelectMany(PresentedDataWidgets).ToList();
         var triggers = vw.Triggers.Select(t =>
         {
             var methodName = "on" + char.ToUpperInvariant(t.Label[0]) + t.Label[1..];
             return $"                ElevatedButton(onPressed: () => widget.controller.{methodName}(), child: const Text('{t.Label}')),";
         }).ToList();
-        var bodyChildren = string.Join("\n", formFields.Concat(triggers));
-        var disposeCalls = string.Join("\n", editableItems.Select(i => "    _" + (char.ToLowerInvariant(i.Label[0]) + i.Label[1..]) + "Controller.dispose();"));
+        var bodyChildren = string.Join("\n", dataWidgets.Concat(formFields).Concat(triggers));
+        var disposeCalls = string.Join("\n", editable.Select(f => "    " + f.ControllerVar + ".dispose();"));
         var content = FillTemplate(LoadTemplate("View.txt"),
             ("ViewName", viewName),
             ("ControllerName", controllerName),
@@ -353,15 +350,60 @@ public class FlutterCodeGenerator
         File.WriteAllText(Path.Combine(viewsPath, ToSnakeCase(viewName) + "_view.dart"), content);
     }
 
-    private static string FormFieldWidget(DataItem item)
+    private record EditableField(DataAggregate Aggregate, DataItem Item, string ControllerVar);
+
+    /// <summary>
+    /// Pola edycji widoku: atrybuty typów prostych agregatów wprowadzanych w tym widoku.
+    /// Nazwa kontrolera zawiera agregat, bo dwa agregaty mogą mieć atrybut o tej samej nazwie.
+    /// </summary>
+    private IEnumerable<EditableField> EditableFields(ViewWidget vw) =>
+        vw.EditableData.SelectMany(agg => agg.Items
+            .Where(i => !i.IsList && !AggregateLabels.Contains(DartType(i.TypeKind)))
+            .Select(i => new EditableField(agg, i, "_" + Naming.LowerFirst(agg.Label) + i.Label + "Controller")));
+
+    /// <summary>Widgety tylko do odczytu pokazujące wartości z prezentera.</summary>
+    private IEnumerable<string> PresentedDataWidgets(DataAggregate agg)
     {
-        var varName = char.ToLowerInvariant(item.Label[0]) + item.Label[1..];
+        var holder = "presenter." + Naming.LowerFirst(agg.Label);
+        foreach (var item in agg.Items)
+        {
+            var value = holder + "?." + ItemVar(item);
+            if (item.IsList)
+            {
+                yield return $"                ListTile(title: Text('{item.Label}', style: Theme.of(context).textTheme.titleMedium)),";
+                var element = AggregatesByLabel.GetValueOrDefault(DartType(item.TypeKind));
+                var (title, subtitle) = element != null && element.Items.Count > 0
+                    ? (Interpolate("item", element.Items.Take(1)), Interpolate("item", element.Items.Skip(1)))
+                    : ("'$item'", "''");
+                yield return "                ListView.builder(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), " +
+                             $"itemCount: {value}.length ?? 0, itemBuilder: (context, index) {{ final item = {holder}!.{ItemVar(item)}[index]; " +
+                             $"return ListTile(title: Text({title}), subtitle: Text({subtitle})); }}),";
+                continue;
+            }
+            var nested = AggregatesByLabel.GetValueOrDefault(DartType(item.TypeKind));
+            var text = nested != null && nested.Items.Count > 0
+                ? Interpolate(value, nested.Items, nullable: true)
+                : $"'${{{value} ?? ''}}'";
+            yield return $"                ListTile(title: const Text('{item.Label}'), subtitle: Text({text})),";
+        }
+    }
+
+    /// <summary>Tekst Darta z wartościami atrybutów typów prostych, rozdzielonymi „ · ”.</summary>
+    private string Interpolate(string holder, IEnumerable<DataItem> items, bool nullable = false)
+    {
+        var parts = items.Where(i => !i.IsList && !AggregateLabels.Contains(DartType(i.TypeKind)))
+            .Select(i => nullable ? $"${{{holder}?.{ItemVar(i)} ?? ''}}" : $"${{{holder}.{ItemVar(i)}}}");
+        return "'" + string.Join(" · ", parts) + "'";
+    }
+
+    private static string FormFieldWidget(DataItem item, string controllerVar)
+    {
         var label = item.Label;
         var tk = (item.TypeKind ?? "").ToLowerInvariant();
         if (tk == "boolean")
-            return "                Padding(padding: const EdgeInsets.only(bottom: 8.0), child: StatefulBuilder(builder: (context, setInnerState) => SwitchListTile(title: const Text('" + label + "'), value: _" + varName + "Controller.text == 'true', onChanged: (v) { setInnerState(() => _" + varName + "Controller.text = v.toString()); }))),";
+            return "                Padding(padding: const EdgeInsets.only(bottom: 8.0), child: StatefulBuilder(builder: (context, setInnerState) => SwitchListTile(title: const Text('" + label + "'), value: " + controllerVar + ".text == 'true', onChanged: (v) { setInnerState(() => " + controllerVar + ".text = v.toString()); }))),";
         var keyboard = tk switch { "integer" => " keyboardType: TextInputType.number,", "float" => " keyboardType: const TextInputType.numberWithOptions(decimal: true),", _ => "" };
-        return "                Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: _" + varName + "Controller, decoration: const InputDecoration(labelText: '" + label + "', border: OutlineInputBorder())," + keyboard + ")),";
+        return "                Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: " + controllerVar + ", decoration: const InputDecoration(labelText: '" + label + "', border: OutlineInputBorder())," + keyboard + ")),";
     }
 
     private void WriteMain(IrModel ir, string libPath)

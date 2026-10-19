@@ -19,7 +19,8 @@ public class DataItem
 {
     public string Label { get; set; } = "";
     public string TypeKind { get; set; } = "";
-    public bool EditableStateItem { get; set; }
+    /// <summary>Atrybut-kolekcja <c>[pojęcie]</c>.</summary>
+    public bool IsList { get; set; }
     public DataItem? BaseDataItem { get; set; }
 }
 

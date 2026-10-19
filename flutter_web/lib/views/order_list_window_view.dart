@@ -39,9 +39,10 @@ class _OrderListWindowViewState extends State<OrderListWindowView> {
           appBar: AppBar(title: const Text('OrderListWindow')),
           body: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: ListView(
               children: [
+                ListTile(title: Text('Orders', style: Theme.of(context).textTheme.titleMedium)),
+                ListView.builder(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: presenter.orderList?.orders.length ?? 0, itemBuilder: (context, index) { final item = presenter.orderList!.orders[index]; return ListTile(title: Text('${item.number}'), subtitle: Text('${item.title} · ${item.dates}')); }),
                 ElevatedButton(onPressed: () => widget.controller.onClose(), child: const Text('close')),
                 ElevatedButton(onPressed: () => widget.controller.onOrderList(), child: const Text('orderList')),
                 ElevatedButton(onPressed: () => widget.controller.onFindOrder(), child: const Text('findOrder')),

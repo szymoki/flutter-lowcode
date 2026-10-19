@@ -81,7 +81,8 @@ public class RslToIrTranslator
                 var item = new DataItem
                 {
                     Label = ToPascalCase(attr.Name),
-                    TypeKind = attr.IsRef && attr.NotionRef != null ? ToPascalCase(attr.NotionRef) : attr.TypeKind
+                    TypeKind = attr.IsRef && attr.NotionRef != null ? ToPascalCase(attr.NotionRef) : attr.TypeKind,
+                    IsList = attr.IsMult
                 };
                 da.Items.Add(item);
             }
@@ -172,6 +173,7 @@ public class RslToIrTranslator
         ctx.CurrentCondition = null;
         ctx.CurrentDAP.Clear();
         ctx.CurrentDAD.Clear();
+        ctx.PendingEditable.Clear();
         ctx.CurrentUCO = ucc.Operations[0];
 
         if (uc.MainScenario.Preconditions.Count > 0)
@@ -313,13 +315,18 @@ public class RslToIrTranslator
             var pres = new PresenterClass { Label = "P" + label };
             vw.Controller = ctrl;
             vw.Presenter = pres;
-            foreach (var da in ctx.CurrentDAP)
-                vw.Data.Add(da);
             ir.Views.Add(vw);
             ir.Controllers.Add(ctrl);
             ir.Presenters.Add(pres);
-            ctx.CurrentUCC?.Presenters.Add(pres);
         }
+        // Ten sam widok może pokazywać kilka przypadków użycia – każdy potrzebuje jego prezentera.
+        if (ctx.CurrentUCC != null && !ctx.CurrentUCC.Presenters.Contains(vw.Presenter!))
+            ctx.CurrentUCC.Presenters.Add(vw.Presenter!);
+        foreach (var da in ctx.CurrentDAP.Where(da => !vw.Data.Contains(da)))
+            vw.Data.Add(da);
+        foreach (var da in ctx.PendingEditable.Where(da => !vw.EditableData.Contains(da)))
+            vw.EditableData.Add(da);
+        ctx.PendingEditable.Clear();
         ctx.CurrentVF = vw;
 
         var po = new POperation { Label = "show" + label };
@@ -339,18 +346,18 @@ public class RslToIrTranslator
     private void ProcessEnterSentence(string notion, IrModel ir, TranslationContext ctx)
     {
         var da = GetOrCreateDataAggregate(notion, ir);
-        foreach (var i in da.Items)
-            i.EditableStateItem = true;
-        ctx.CurrentDAP.Add(da);
-        ctx.CurrentDAD.Add(da);
+        if (!ctx.CurrentDAD.Contains(da))
+            ctx.CurrentDAD.Add(da);
 
-        // <enter> zawsze następuje po <show> formularza, do którego dane są wprowadzane
-        // (system najpierw pokazuje formularz, dopiero potem aktor go wypełnia). Widok
-        // został już utworzony przez ProcessShowSentence z pustym Data, więc encję
-        // trzeba dopiąć bezpośrednio do aktualnie wyświetlanego widoku, inaczej formularz
-        // nigdy nie dostanie pól wejściowych.
-        if (ctx.CurrentVF != null && !ctx.CurrentVF.Data.Contains(da))
-            ctx.CurrentVF.Data.Add(da);
+        // <enter> następuje po <show> formularza, który aktor wypełnia, więc dane są polami
+        // edycji ostatnio wyświetlonego widoku – a nie danymi do prezentacji w następnym (D6.1).
+        if (ctx.CurrentVF == null)
+        {
+            if (!ctx.PendingEditable.Contains(da))
+                ctx.PendingEditable.Add(da);
+        }
+        else if (!ctx.CurrentVF.EditableData.Contains(da))
+            ctx.CurrentVF.EditableData.Add(da);
     }
 
     /// <summary>
@@ -444,8 +451,7 @@ public class RslToIrTranslator
     {
         var si = GetOrCreateServiceInterface(notion, ir);
         // <read> zwraca obiekt pojęcia, więc jego klasa modelu musi istnieć, nawet bez definicji Data.
-        if (type == PredicateType.Read)
-            GetOrCreateDataAggregate(notion, ir);
+        var readAggregate = type == PredicateType.Read ? GetOrCreateDataAggregate(notion, ir) : null;
         var sop = new SOperation
         {
             Label = type.ToString().ToLowerInvariant() + ToPascalCase(notion),
@@ -460,6 +466,10 @@ public class RslToIrTranslator
 
         if (ctx.CurrentUCC != null && !ctx.CurrentUCC.Services.Contains(si))
             ctx.CurrentUCC.Services.Add(si);
+
+        // Odczytany obiekt pokazuje następny widok.
+        if (readAggregate != null && !ctx.CurrentDAP.Contains(readAggregate))
+            ctx.CurrentDAP.Add(readAggregate);
     }
 
     private void ProcessConditionSentence(List<Expression> exprs, IrModel ir, TranslationContext ctx)
