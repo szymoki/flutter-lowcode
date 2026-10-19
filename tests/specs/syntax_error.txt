@@ -1,0 +1,4 @@
+Use case Add order Main scenario
+00: Cashier <select> add order
+01: System <shows> add order form
+-> end ! OK

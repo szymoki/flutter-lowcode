@@ -73,6 +73,7 @@ public class RslBisAstBuilder : RslBisBaseVisitor<object?>
 
         return new Scenario
         {
+            Preconditions = conditions ?? new List<UcCondition>(),
             AltSentences = sentences,
             EndSentence = endSentence
         };
@@ -116,7 +117,9 @@ public class RslBisAstBuilder : RslBisBaseVisitor<object?>
     {
         var notion = context.notion() != null ? GetMultiWordText(context.notion()) : "user";
         var value = GetMultiWordText(context.value());
-        var negated = context.GetText().Contains("'-'");
+        var negated = Enumerable.Range(0, context.ChildCount)
+            .Select(context.GetChild)
+            .Any(c => c is ITerminalNode tn && tn.GetText() == "-");
         return new ValueCondition { Notion = notion, Value = value, Negated = negated };
     }
 

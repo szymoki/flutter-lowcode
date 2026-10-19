@@ -1,10 +1,13 @@
 using FlutterCodeGenerator;
 
-// args[0] = folder z plikami .txt (RSL-bis), args[1] = folder wyjściowy (aplikacja Flutter)
-var inputFolder = args.Length > 0 ? args[0] : Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "examples");
-var outputFolder = args.Length > 1 ? args[1] : Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "flutter_web");
+// Kody wyjścia: 0 – sukces, 1 – błędy specyfikacji, 2 – złe użycie.
+if (args.Length != 2)
+{
+    Console.Error.WriteLine("Użycie: FlutterCodeGenerator <folder_z_plikami_.txt> <folder_wyjściowy>");
+    return 2;
+}
 
-var result = Pipeline.Run(inputFolder, outputFolder, Console.Out);
+var result = Pipeline.Run(args[0], args[1], Console.Out);
 foreach (var w in result.Warnings)
     Console.Error.WriteLine("Ostrzeżenie: " + w);
 foreach (var e in result.Errors)

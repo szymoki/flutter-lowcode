@@ -54,4 +54,5 @@ public class Expression
 {
     public string Notion { get; set; } = "";
     public string Val { get; set; } = "";
+    public bool Negated { get; set; }
 }

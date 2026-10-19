@@ -28,18 +28,12 @@ public static class Pipeline
         var rslFiles = Directory.Exists(inputFolder)
             ? Directory.GetFiles(inputFolder, "*.txt", SearchOption.AllDirectories)
             : Array.Empty<string>();
+        // Kolejność plików wpływa na kolejność przypadków użycia w IR, więc nie może zależeć od systemu plików.
+        Array.Sort(rslFiles, StringComparer.Ordinal);
 
         if (rslFiles.Length == 0)
         {
-            log.WriteLine("Brak plików .txt w folderze: " + Path.GetFullPath(inputFolder));
-            log.WriteLine("Użycie: FlutterCodeGenerator <input_folder> <output_folder>");
-            // Generuj minimalną aplikację bez wejścia
-            outputFolder = Path.GetFullPath(outputFolder);
-            Directory.CreateDirectory(outputFolder);
-            var emptyIr = new IrModel();
-            new Generator.FlutterCodeGenerator().Generate(emptyIr, outputFolder);
-            result.Ir = emptyIr;
-            log.WriteLine("Wygenerowano szkielet aplikacji Flutter w: " + outputFolder);
+            result.Errors.Add("Brak plików .txt w folderze: " + Path.GetFullPath(inputFolder));
             return result;
         }
 
@@ -47,10 +41,12 @@ public static class Pipeline
         var notions = new List<NotionDef>();
         foreach (var file in rslFiles)
         {
-            var (fileUseCases, fileNotions) = Parse(File.ReadAllText(file), file, result.Errors, log);
+            var (fileUseCases, fileNotions) = Parse(File.ReadAllText(file), Path.GetRelativePath(inputFolder, file), result.Errors, log);
             useCases.AddRange(fileUseCases);
             notions.AddRange(fileNotions);
         }
+        if (!result.Success)
+            return result;
 
         var irModel = new RslToIrTranslator().Translate(useCases, notions);
         result.Ir = irModel;
@@ -68,10 +64,19 @@ public static class Pipeline
     {
         var bytes = Encoding.UTF8.GetBytes(text);
         var input = new AntlrInputStream(new MemoryStream(bytes));
+        var collector = new SyntaxErrorCollector(fileName, errors);
         var lexer = new RslBisLexer(input);
+        lexer.RemoveErrorListeners();
+        lexer.AddErrorListener(collector);
         var tokens = new CommonTokenStream(lexer);
         var parser = new RslBisParser(tokens);
+        parser.RemoveErrorListeners();
+        parser.AddErrorListener(collector);
         var tree = parser.start();
+        // Drzewo po błędach jest naprawione heurystycznie przez ANTLR i może nie mieć
+        // wymaganych węzłów, więc nie budujemy z niego modelu.
+        if (collector.Count > 0)
+            return (Array.Empty<UseCase>(), Array.Empty<NotionDef>());
 
         var builder = new RslBisAstBuilder();
         builder.Visit(tree);

@@ -67,7 +67,7 @@ public class RslToIrTranslator
             foreach (var cond in d.Conditions)
             {
                 var cc = new Condition { Label = cond.Label, Value = cond.Value != null ? new Value { Label = cond.Value.Label } : null };
-                cc.Expressions.AddRange(cond.Expressions.Select(x => new Expression { Notion = x.Notion, Val = x.Val }));
+                cc.Expressions.AddRange(cond.Expressions.Select(x => new Expression { Notion = x.Notion, Val = x.Val, Negated = x.Negated }));
                 foreach (var i in cond.Instructions)
                     cc.Instructions.Add(CloneInstruction(i));
                 clone.Conditions.Add(cc);
@@ -130,6 +130,7 @@ public class RslToIrTranslator
         };
         ir.UseCases.Add(ucc);
         ctx.CurrentUCC = ucc;
+        ctx.ContextDA.Clear();
 
         var initOp = new UCOperation { Label = "execute", IsInitial = true };
         ucc.Operations.Add(initOp);
@@ -146,8 +147,12 @@ public class RslToIrTranslator
             if (cond is ContextCondition cc)
             {
                 var da = GetOrCreateDataAggregate(cc.Notion, ir);
-                ctx.CurrentDAD.Add(da);
+                if (!ctx.ContextDA.Contains(da))
+                    ctx.ContextDA.Add(da);
             }
+            // Warunek na podmiocie „user” określa rolę aktora, a nie dane – nie tworzy usługi IUser.
+            else if (cond is ValueCondition { Notion: "user" })
+                continue;
             else if (cond is ValueCondition vc)
             {
                 var si = GetOrCreateServiceInterface(vc.Notion, ir);
@@ -212,7 +217,7 @@ public class RslToIrTranslator
             var exprs = cond.Conditions.Select(c =>
             {
                 if (c is ValueCondition vc)
-                    return new Expression { Notion = vc.Notion, Val = vc.Value };
+                    return new Expression { Notion = vc.Notion, Val = vc.Value, Negated = vc.Negated };
                 return new Expression { Notion = (c as ContextCondition)?.Notion ?? "", Val = "" };
             }).ToList();
             ProcessConditionSentence(exprs, ir, ctx);
@@ -295,7 +300,7 @@ public class RslToIrTranslator
             Label = type.ToString().ToLowerInvariant() + ToPascalCase(notion),
             Type = type
         };
-        foreach (var da in ctx.CurrentDAD)
+        foreach (var da in ctx.CurrentDAD.Concat(ctx.ContextDA).Distinct())
             sop.Parameters.Add(new Parameter { Label = da.Label, Type = da.Label });
         si.Methods.Add(sop);
 

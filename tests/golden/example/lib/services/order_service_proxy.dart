@@ -22,7 +22,7 @@ class OrderServiceProxy implements IOrder {
   }
 
   @override
-  Future<Future<void>> deleteOrder() async {
+  Future<Future<void>> deleteOrder(Order order) async {
     throw UnimplementedError();
   }
 

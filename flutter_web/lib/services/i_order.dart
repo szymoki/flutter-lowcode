@@ -7,5 +7,5 @@ abstract class IOrder {
   Future<Future<dynamic>> readOrder(OrderSearch orderSearch);
   Future<OrderCheckResult> checkOrder(Order order);
   Future<Future<void>> updateOrder(Order order);
-  Future<Future<void>> deleteOrder();
+  Future<Future<void>> deleteOrder(Order order);
 }
