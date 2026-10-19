@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Reflection;
 using System.Text;
 using FlutterCodeGenerator.Model.Ir;
@@ -25,19 +24,27 @@ public class FlutterCodeGenerator
         return result;
     }
 
-    private static string ToSnakeCase(string s)
-    {
-        if (string.IsNullOrWhiteSpace(s)) return "";
-        var words = System.Text.RegularExpressions.Regex.Replace(s, "([a-z])([A-Z])", "$1_$2").Split('_', ' ');
-        return string.Join("_", words.Select(w => w.ToLowerInvariant()));
-    }
+    private static string ToSnakeCase(string s) => Naming.SnakeFromPascal(s);
 
-    private static string ToPascalCase(string s)
+    private static string ToPascalCase(string s) => Naming.Pascal(s);
+
+    /// <summary>Pierwsza linia zaślepki proxy. Dopóki istnieje, generator może nadpisać plik.</summary>
+    private const string ProxyStubMarker = "// WYGENEROWANO: plik jest nadpisywany przy każdej generacji, dopóki zawiera tę linię. Usuń ją po uzupełnieniu implementacji.";
+
+    private static string ServiceVar(ServiceInterface s) => Naming.Camel(s.NotionName);
+    private static string ServiceProxyClass(ServiceInterface s) => Naming.Pascal(s.NotionName) + "ServiceProxy";
+    private static string ServiceInterfaceFile(ServiceInterface s) => "i_" + Naming.Snake(s.NotionName) + ".dart";
+    private static string ServiceProxyFile(ServiceInterface s) => Naming.Snake(s.NotionName) + "_service_proxy.dart";
+    private static string CheckResultClass(ServiceInterface s) => Naming.Pascal(s.NotionName) + "CheckResult";
+    private static string ModelImport(string typeLabel, string prefix = "../models/") => "import '" + prefix + ToSnakeCase(typeLabel) + ".dart';";
+
+    /// <summary>Typ zwracany operacji usługi (bez opakowania w Future).</summary>
+    private static string ServiceResultType(ServiceInterface si, SOperation m) => m.Type switch
     {
-        if (string.IsNullOrWhiteSpace(s)) return "";
-        var words = s.Trim().Split(new[] { ' ', '_' }, StringSplitOptions.RemoveEmptyEntries);
-        return string.Concat(words.Select(w => char.ToUpper(w[0], CultureInfo.InvariantCulture) + w[1..].ToLowerInvariant()));
-    }
+        PredicateType.Check => CheckResultClass(si),
+        PredicateType.Read => Naming.Pascal(si.NotionName),
+        _ => "void"
+    };
 
     private static string DartType(string typeKind)
     {
@@ -56,8 +63,11 @@ public class FlutterCodeGenerator
         };
     }
 
+    private HashSet<string> AggregateLabels = new();
+
     public void Generate(IrModel ir, string outputFolder)
     {
+        AggregateLabels = ir.ViewModel.Aggregates.Select(a => a.Label).ToHashSet();
         var libPath = Path.Combine(outputFolder, "lib");
         Directory.CreateDirectory(libPath);
 
@@ -67,6 +77,8 @@ public class FlutterCodeGenerator
         var useCasesPath = Path.Combine(libPath, "use_cases");
         var controllersPath = Path.Combine(libPath, "controllers");
         var viewsPath = Path.Combine(libPath, "views");
+
+        RemoveStaleFiles(libPath);
 
         Directory.CreateDirectory(modelsPath);
         Directory.CreateDirectory(servicesPath);
@@ -80,9 +92,8 @@ public class FlutterCodeGenerator
 
         foreach (var si in ir.Services)
         {
-            var notionName = si.Label.TrimStart('I');
-            foreach (var m in si.Methods.Where(m => m.Type == PredicateType.Check))
-                WriteCheckResultStub(ToPascalCase(notionName) + "CheckResult", modelsPath);
+            if (si.Methods.Any(m => m.Type == PredicateType.Check))
+                WriteCheckResultStub(CheckResultClass(si), modelsPath);
             WriteServiceInterface(si, servicesPath, ir);
         }
 
@@ -101,6 +112,24 @@ public class FlutterCodeGenerator
         WriteMain(ir, libPath);
         WriteApp(ir, libPath);
         WritePubspec(outputFolder);
+    }
+
+    /// <summary>
+    /// Usuwa pliki z poprzedniej generacji, żeby nie zostawały klasy pojęć usuniętych ze specyfikacji.
+    /// Nie rusza zaślepek proxy ani plików spoza katalogów generatora.
+    /// </summary>
+    private static void RemoveStaleFiles(string libPath)
+    {
+        foreach (var dir in new[] { "models", "views", "controllers", "presenters", "use_cases" })
+        {
+            var path = Path.Combine(libPath, dir);
+            if (Directory.Exists(path))
+                Directory.Delete(path, recursive: true);
+        }
+        var servicesPath = Path.Combine(libPath, "services");
+        if (Directory.Exists(servicesPath))
+            foreach (var file in Directory.GetFiles(servicesPath, "i_*.dart"))
+                File.Delete(file);
     }
 
     private void WriteDataAggregate(DataAggregate agg, string modelsPath)
@@ -123,6 +152,12 @@ public class FlutterCodeGenerator
             var name = char.ToLowerInvariant(i.Label[0]) + i.Label[1..];
             return $"{DartType(i.TypeKind)}? {name}";
         }).ToList();
+        var nestedTypes = agg.Items.Select(i => DartType(i.TypeKind))
+            .Where(t => t != agg.Label && AggregateLabels.Contains(t))
+            .Distinct().OrderBy(t => t, StringComparer.Ordinal).ToList();
+        var modelImports = nestedTypes.Count > 0
+            ? string.Join("\n", nestedTypes.Select(t => "import '" + ToSnakeCase(t) + ".dart';")) + "\n\n"
+            : "";
         var copyAssign = agg.Items.Select(i =>
         {
             var name = char.ToLowerInvariant(i.Label[0]) + i.Label[1..];
@@ -136,9 +171,10 @@ public class FlutterCodeGenerator
 
         var objectContent = FillTemplate(LoadTemplate("ModelObject.txt"),
             ("ClassName", agg.Label),
+            ("ModelImports", modelImports),
             ("Fields", string.Join("\n", fields)),
             ("Constructor", constructor),
-            ("CopyParams", string.Join(", ", copyParams)),
+            ("CopyParams", copyParams.Count > 0 ? "{" + string.Join(", ", copyParams) + "}" : ""),
             ("CopyAssignInline", copyAssignInline));
         File.WriteAllText(Path.Combine(modelsPath, ToSnakeCase(agg.Label) + ".dart"), objectContent);
     }
@@ -152,48 +188,46 @@ public class FlutterCodeGenerator
 
     private void WriteServiceInterface(ServiceInterface si, string servicesPath, IrModel ir)
     {
-        var ifaceName = si.Label.StartsWith("I") ? si.Label : "I" + si.Label;
-        var notionName = si.Label.TrimStart('I');
-        var ifaceFile = "i_" + ToSnakeCase(notionName) + ".dart";
-        var modelNames = ir.ViewModel.Aggregates.Select(a => a.Label).ToHashSet();
+        var ifaceName = si.Label;
+        var ifaceFile = ServiceInterfaceFile(si);
         var usedTypes = new HashSet<string>();
         foreach (var m in si.Methods)
         {
-            if (m.Type == PredicateType.Check) usedTypes.Add(ToPascalCase(notionName) + "CheckResult");
+            var resultType = ServiceResultType(si, m);
+            if (resultType != "void") usedTypes.Add(resultType);
             foreach (var p in m.Parameters)
-                if (modelNames.Contains(p.Type)) usedTypes.Add(p.Type);
+                if (AggregateLabels.Contains(p.Type)) usedTypes.Add(p.Type);
         }
-        var modelImportsStr = usedTypes.Count > 0 ? string.Join("\n", usedTypes.Select(t => "import '../models/" + ToSnakeCase(t) + ".dart';")) + "\n" : "";
+        var modelImportsStr = usedTypes.Count > 0
+            ? string.Join("\n", usedTypes.OrderBy(t => t, StringComparer.Ordinal).Select(t => ModelImport(t))) + "\n"
+            : "";
 
-        var methods = si.Methods.Select(m =>
+        string Signature(SOperation m)
         {
-            var ret = m.Type == PredicateType.Check ? $"{ToPascalCase(notionName)}CheckResult" : "Future<void>";
-            if (m.Type == PredicateType.Read) ret = "Future<dynamic>";
             var pars = string.Join(", ", m.Parameters.Select(p => $"{p.Type} {char.ToLowerInvariant(p.Label[0]) + p.Label[1..]}"));
-            return $"  Future<{ret}> {char.ToLowerInvariant(m.Label[0]) + m.Label[1..]}({pars});";
-        }).ToList();
+            return $"Future<{ServiceResultType(si, m)}> {char.ToLowerInvariant(m.Label[0]) + m.Label[1..]}({pars})";
+        }
+
+        var methods = si.Methods.Select(m => "  " + Signature(m) + ";").ToList();
         var content = FillTemplate(LoadTemplate("ServiceInterface.txt"),
             ("InterfaceName", ifaceName),
             ("ModelImports", modelImportsStr),
             ("Methods", string.Join("\n", methods)));
-        content = content.Replace("{{ModelImports}}", ""); // fallback if placeholder remained
         File.WriteAllText(Path.Combine(servicesPath, ifaceFile), content);
 
+        var proxyPath = Path.Combine(servicesPath, ServiceProxyFile(si));
+        if (File.Exists(proxyPath) && !File.ReadAllText(proxyPath).StartsWith(ProxyStubMarker, StringComparison.Ordinal))
+            return;
         var proxyMethods = si.Methods.Select(m =>
-        {
-            var ret = m.Type == PredicateType.Check ? $"{ToPascalCase(notionName)}CheckResult" : "Future<void>";
-            if (m.Type == PredicateType.Read) ret = "Future<dynamic>";
-            var pars = string.Join(", ", m.Parameters.Select(p => $"{p.Type} {char.ToLowerInvariant(p.Label[0]) + p.Label[1..]}"));
-            return "  @override\n  Future<" + ret + "> " + (char.ToLowerInvariant(m.Label[0]) + m.Label[1..]) + "(" + pars + ") async {\n    throw UnimplementedError();\n  }\n";
-        }).ToList();
+            "  @override\n  " + Signature(m) + " async {\n    throw UnimplementedError();\n  }\n").ToList();
         var proxyContent = FillTemplate(LoadTemplate("ServiceProxy.txt"),
+            ("Marker", ProxyStubMarker),
             ("InterfaceFile", ifaceFile),
-            ("NotionName", notionName),
+            ("ProxyClass", ServiceProxyClass(si)),
             ("InterfaceName", ifaceName),
             ("ModelImports", modelImportsStr),
             ("ProxyMethods", string.Join("\n", proxyMethods)));
-        proxyContent = proxyContent.Replace("{{ModelImports}}", ""); // fallback
-        File.WriteAllText(Path.Combine(servicesPath, ToSnakeCase(notionName) + "_service_proxy.dart"), proxyContent);
+        File.WriteAllText(proxyPath, proxyContent);
     }
 
     private void WritePresenter(PresenterClass pres, string presentersPath, IrModel ir)
@@ -233,11 +267,7 @@ public class FlutterCodeGenerator
         foreach (var p in uc.Presenters)
             ctorParams.Add($"required {p.Label} {char.ToLowerInvariant(p.Label[0]) + p.Label[1..]}");
         foreach (var s in uc.Services)
-        {
-            var notionName = s.Label.TrimStart('I');
-            var serviceVar = notionName.Length > 1 ? char.ToLowerInvariant(notionName[0]) + notionName[1..] : notionName.ToLowerInvariant();
-            ctorParams.Add($"required {s.Label} {serviceVar}");
-        }
+            ctorParams.Add($"required {s.Label} {ServiceVar(s)}");
         var constructorParams = "{ " + string.Join(", ", ctorParams) + " }";
 
         var initParts = new List<string>();
@@ -247,11 +277,7 @@ public class FlutterCodeGenerator
             initParts.Add($"_{varName} = {varName}");
         }
         foreach (var s in uc.Services)
-        {
-            var notionName = s.Label.TrimStart('I');
-            var varName = notionName.Length > 1 ? char.ToLowerInvariant(notionName[0]) + notionName[1..] : notionName.ToLowerInvariant();
-            initParts.Add($"_{varName} = {varName}");
-        }
+            initParts.Add($"_{ServiceVar(s)} = {ServiceVar(s)}");
         var initializerList = initParts.Count > 0 ? ": " + string.Join(",\n      ", initParts) + ";" : ";";
 
         var operationMethods = new HashSet<string> { "execute", "handleClose" };
@@ -262,14 +288,9 @@ public class FlutterCodeGenerator
         var operationMethodsCode = string.Join("\n", operationMethods.Select(m => $"  void {m}() {{}}"));
 
         var presenterImports = uc.Presenters.Select(p => "import '../presenters/" + ToSnakeCase(p.Label) + "_presenter.dart';").ToList();
-        var serviceImports = uc.Services.Select(s => "import '../services/i_" + ToSnakeCase(s.Label.TrimStart('I')) + ".dart';").ToList();
+        var serviceImports = uc.Services.Select(s => "import '../services/" + ServiceInterfaceFile(s) + "';").ToList();
         var presenterFields = string.Join("\n", uc.Presenters.Select(p => $"  final {p.Label} _{char.ToLowerInvariant(p.Label[0]) + p.Label[1..]};"));
-        var serviceFields = string.Join("\n", uc.Services.Select(s =>
-        {
-            var notionName = s.Label.TrimStart('I');
-            var varName = notionName.Length > 1 ? char.ToLowerInvariant(notionName[0]) + notionName[1..] : notionName.ToLowerInvariant();
-            return $"  final {s.Label} _{varName};";
-        }));
+        var serviceFields = string.Join("\n", uc.Services.Select(s => $"  final {s.Label} _{ServiceVar(s)};"));
 
         var content = FillTemplate(LoadTemplate("UseCase.txt"),
             ("ClassName", uc.Label),
@@ -365,11 +386,7 @@ public class FlutterCodeGenerator
             .Distinct().Select(c => "import 'controllers/" + ToSnakeCase(c.Label.TrimStart('C')) + "_controller.dart';").ToList();
         var viewImports = ir.Views.Select(v => "import 'views/" + ToSnakeCase(v.Label) + "_view.dart';").ToList();
         var allServices = ir.UseCases.SelectMany(u => u.Services).DistinctBy(s => s.Label).ToList();
-        var serviceProxyImports = allServices.Select(s =>
-        {
-            var notionName = s.Label.TrimStart('I');
-            return "import 'services/" + ToSnakeCase(notionName) + "_service_proxy.dart';";
-        }).ToList();
+        var serviceProxyImports = allServices.Select(s => "import 'services/" + ServiceProxyFile(s) + "';").ToList();
 
         var useCaseFields = ir.UseCases.Select(uc => "  " + uc.Label + "UseCase? " + UcVar(uc) + ";").ToList();
         var controllerFields = ir.Views.Where(v => v.Controller != null).Select(v =>
@@ -385,12 +402,7 @@ public class FlutterCodeGenerator
             var varName = char.ToLowerInvariant(p.Label[0]) + p.Label[1..];
             return "      final " + varName + " = context.read<" + p.Label + ">();";
         }).ToList();
-        var serviceCreations = allServices.Select(s =>
-        {
-            var notionName = s.Label.TrimStart('I');
-            var varName = char.ToLowerInvariant(notionName[0]) + (notionName.Length > 1 ? notionName[1..] : "");
-            return "      final " + varName + " = " + notionName + "ServiceProxy();";
-        }).ToList();
+        var serviceCreations = allServices.Select(s => "      final " + ServiceVar(s) + " = " + ServiceProxyClass(s) + "();").ToList();
 
         var useCaseCreations = ir.UseCases.Select(uc =>
         {
@@ -400,11 +412,7 @@ public class FlutterCodeGenerator
             foreach (var p in uc.Presenters)
                 useCaseParams.Add(char.ToLowerInvariant(p.Label[0]) + p.Label[1..] + ": " + (char.ToLowerInvariant(p.Label[0]) + p.Label[1..]));
             foreach (var s in uc.Services)
-            {
-                var notionName = s.Label.TrimStart('I');
-                var varName = char.ToLowerInvariant(notionName[0]) + (notionName.Length > 1 ? notionName[1..] : "");
-                useCaseParams.Add(varName + ": " + varName);
-            }
+                useCaseParams.Add(ServiceVar(s) + ": " + ServiceVar(s));
             return "      " + ucVar + " = " + useCaseType + "(" + string.Join(", ", useCaseParams) + ");";
         }).ToList();
         var firstUcVar = UcVar(ir.UseCases.First());
@@ -448,26 +456,40 @@ public class FlutterCodeGenerator
     private void WritePubspec(string outputFolder)
     {
         var path = Path.Combine(outputFolder, "pubspec.yaml");
-        var content = LoadTemplate("Pubspec.txt");
-        if (File.Exists(path))
+        if (!File.Exists(path))
         {
-            var existing = File.ReadAllText(path);
-            if (!existing.Contains("provider:"))
-            {
-                // Insert under dependencies (after first "sdk: flutter" line), not at end of file
-                var idx = existing.IndexOf("sdk: flutter", StringComparison.Ordinal);
-                if (idx >= 0)
-                {
-                    var endOfLine = existing.IndexOf("\n", idx, StringComparison.Ordinal);
-                    if (endOfLine < 0) endOfLine = existing.Length;
-                    existing = existing[..(endOfLine + 1)] + "  provider: ^6.0.0\n" + existing[(endOfLine + 1)..];
-                }
-                else
-                    existing = existing.TrimEnd() + "\n  provider: ^6.0.0\n";
-                File.WriteAllText(path, existing);
-            }
+            File.WriteAllText(path, LoadTemplate("Pubspec.txt"));
+            return;
         }
-        else
-            File.WriteAllText(path, content);
+
+        var existing = File.ReadAllText(path);
+        if (!existing.Contains("provider:"))
+        {
+            // Insert under dependencies (after first "sdk: flutter" line), not at end of file
+            var idx = existing.IndexOf("sdk: flutter", StringComparison.Ordinal);
+            if (idx >= 0)
+            {
+                var endOfLine = existing.IndexOf("\n", idx, StringComparison.Ordinal);
+                if (endOfLine < 0) endOfLine = existing.Length;
+                existing = existing[..(endOfLine + 1)] + "  provider: ^6.0.0\n" + existing[(endOfLine + 1)..];
+            }
+            else
+                existing = existing.TrimEnd() + "\n  provider: ^6.0.0\n";
+        }
+        if (!existing.Contains("uses-material-design:"))
+        {
+            // Sekcja najwyższego poziomu „flutter:” (bez wcięcia), a nie zależność „flutter:” z dependencies.
+            var lines = existing.Split('\n').ToList();
+            var sectionIdx = lines.FindIndex(l => l.TrimEnd() == "flutter:");
+            if (sectionIdx >= 0)
+                lines.Insert(sectionIdx + 1, "  uses-material-design: true");
+            else
+            {
+                while (lines.Count > 0 && lines[^1].Trim() == "") lines.RemoveAt(lines.Count - 1);
+                lines.AddRange(new[] { "", "flutter:", "  uses-material-design: true", "" });
+            }
+            existing = string.Join("\n", lines);
+        }
+        File.WriteAllText(path, existing);
     }
 }

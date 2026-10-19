@@ -1,5 +1,5 @@
 // Generated from IR
-class {{ClassName}} {
+{{ModelImports}}class {{ClassName}} {
 {{Fields}}
 
 {{Constructor}}

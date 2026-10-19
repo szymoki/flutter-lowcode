@@ -9,6 +9,8 @@ public class ViewModel
 public class DataAggregate
 {
     public string Label { get; set; } = "";
+    /// <summary>Oryginalna nazwa pojęcia RSL („order search”), z której generator wyprowadza nazwy.</summary>
+    public string NotionName { get; set; } = "";
     public DataAggregate? BaseType { get; set; }
     public List<DataItem> Items { get; } = new();
 }

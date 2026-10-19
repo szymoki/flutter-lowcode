@@ -6,7 +6,7 @@ class OrderSearch {
     required this.title
   });
 
-  OrderSearch copyWith(String? title) {
+  OrderSearch copyWith({String? title}) {
     return OrderSearch(
       title: title ?? this.title
     );

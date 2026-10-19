@@ -1,4 +1,3 @@
-using System.Globalization;
 using FlutterCodeGenerator.Model.Ir;
 using FlutterCodeGenerator.Model.Rsl;
 
@@ -6,18 +5,9 @@ namespace FlutterCodeGenerator.Translation;
 
 public class RslToIrTranslator
 {
-    private static string ToPascalCase(string s)
-    {
-        if (string.IsNullOrWhiteSpace(s)) return "";
-        var words = s.Trim().Split(new[] { ' ', '_' }, StringSplitOptions.RemoveEmptyEntries);
-        return string.Concat(words.Select(w => char.ToUpper(w[0], CultureInfo.InvariantCulture) + w[1..].ToLowerInvariant()));
-    }
+    private static string ToPascalCase(string s) => Naming.Pascal(s);
 
-    private static string ToCamelCase(string s)
-    {
-        var p = ToPascalCase(s);
-        return p.Length > 0 ? char.ToLowerInvariant(p[0]) + p[1..] : "";
-    }
+    private static string ToCamelCase(string s) => Naming.Camel(s);
 
     private static DataAggregate GetOrCreateDataAggregate(string notion, IrModel ir)
     {
@@ -25,7 +15,7 @@ public class RslToIrTranslator
         var da = ir.ViewModel.Aggregates.FirstOrDefault(a => a.Label == label);
         if (da == null)
         {
-            da = new DataAggregate { Label = label };
+            da = new DataAggregate { Label = label, NotionName = notion.Trim() };
             ir.ViewModel.Aggregates.Add(da);
         }
         return da;
@@ -37,7 +27,7 @@ public class RslToIrTranslator
         var si = ir.Services.FirstOrDefault(s => s.Label == label);
         if (si == null)
         {
-            si = new ServiceInterface { Label = label };
+            si = new ServiceInterface { Label = label, NotionName = notion.Trim() };
             ir.Services.Add(si);
         }
         return si;
@@ -295,6 +285,9 @@ public class RslToIrTranslator
     private void ProcessSystemDataSentence(PredicateType type, string notion, IrModel ir, TranslationContext ctx)
     {
         var si = GetOrCreateServiceInterface(notion, ir);
+        // <read> zwraca obiekt pojęcia, więc jego klasa modelu musi istnieć, nawet bez definicji Data.
+        if (type == PredicateType.Read)
+            GetOrCreateDataAggregate(notion, ir);
         var sop = new SOperation
         {
             Label = type.ToString().ToLowerInvariant() + ToPascalCase(notion),
