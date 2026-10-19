@@ -28,7 +28,7 @@ class _{{ViewName}}ViewState extends State<{{ViewName}}View> {
       builder: (context, presenter, child) {
         if (!presenter.isVisible) return const SizedBox.shrink();
         return Scaffold(
-          appBar: AppBar(title: const Text('{{ViewName}}')),
+          appBar: AppBar(title: const Text('{{ViewTitle}}')),
           body: Padding(
             padding: const EdgeInsets.all(16.0),
             child: ListView(

@@ -1,0 +1,24 @@
+Use case Start Main scenario
+00: User <select> application
+01: System <show> main menu
+02: User <invoke> Plan visit
+-> rejoin 01
+
+Use case Plan visit Main scenario
+00: Patient <select> plan visit
+01: System <show> visit form
+02: Patient <enter> visit
+03: Patient <select> save
+04: System <update> visit
+05: System <close> visit form
+06: System <show> visit saved message
+07: Patient <select> ok
+-> end ! OK
+
+View *form* visit form {Nowa wizyta}, visit saved message {Zapisano}
+Trigger *button* save {Zapisz}, plan visit {Umow wizyte}
+
+Data visit {
+    day : date,
+    note : text
+}

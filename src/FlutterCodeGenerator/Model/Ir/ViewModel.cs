@@ -34,7 +34,11 @@ public class Parameter
 public class Trigger
 {
     public string Label { get; set; } = "";
+    /// <summary>Typ z definicji <c>Trigger *typ*</c>.</summary>
     public string Type { get; set; } = "";
+    /// <summary>Etykieta z definicji <c>Trigger</c> (<c>{…}</c>), wyświetlana na przycisku.</summary>
+    public string? UiLabel { get; set; }
+    public string Text => UiLabel ?? Label;
 }
 
 public class EnumUnion

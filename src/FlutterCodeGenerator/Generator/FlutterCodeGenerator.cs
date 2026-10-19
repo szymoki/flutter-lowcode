@@ -354,11 +354,11 @@ public class FlutterCodeGenerator
             var methodName = "on" + char.ToUpperInvariant(t.Label[0]) + t.Label[1..];
             var input = vw.Controller!.Operations.FirstOrDefault(o => o.Label == methodName)?.Target?.InputData ?? new List<DataAggregate>();
             if (input.Count == 0)
-                return $"                ElevatedButton(onPressed: () => widget.controller.{methodName}(), child: const Text('{t.Label}')),";
+                return $"                ElevatedButton(onPressed: () => widget.controller.{methodName}(), child: const Text('{t.Text}')),";
             // Obiekty modelu z pól formularza; null oznacza błąd konwersji, zgłoszony już użytkownikowi (D8.3).
             var builds = string.Join(" ", input.Select(d => $"final {Naming.LowerFirst(d.Label)} = _build{d.Label}(); if ({Naming.LowerFirst(d.Label)} == null) return;"));
             var args = string.Join(", ", input.Select(d => Naming.LowerFirst(d.Label)));
-            return $"                ElevatedButton(onPressed: () {{ {builds} widget.controller.{methodName}({args}); }}, child: const Text('{t.Label}')),";
+            return $"                ElevatedButton(onPressed: () {{ {builds} widget.controller.{methodName}({args}); }}, child: const Text('{t.Text}')),";
         }).ToList();
         var builders = vw.EditableData.Select(d => ModelBuilder(d, editable)).ToList();
         var needsModelImports = vw.EditableData.Count > 0;
@@ -366,6 +366,7 @@ public class FlutterCodeGenerator
         var disposeCalls = string.Join("\n", editable.Select(f => "    " + f.ControllerVar + ".dispose();"));
         var content = FillTemplate(LoadTemplate("View.txt"),
             ("ViewName", viewName),
+            ("ViewTitle", vw.Title),
             ("ControllerName", controllerName),
             ("ControllerSnake", ToSnakeCase(controllerName[1..])),
             ("PresenterName", presenterName),
@@ -482,6 +483,10 @@ public class FlutterCodeGenerator
         var tk = (item.TypeKind ?? "").ToLowerInvariant();
         if (tk == "boolean")
             return "                Padding(padding: const EdgeInsets.only(bottom: 8.0), child: StatefulBuilder(builder: (context, setInnerState) => SwitchListTile(title: const Text('" + label + "'), value: " + controllerVar + ".text == 'true', onChanged: (v) { setInnerState(() => " + controllerVar + ".text = v.toString()); }))),";
+        if (tk == "date")
+            return "                Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: " + controllerVar + ", readOnly: true, decoration: const InputDecoration(labelText: '" + label + "', border: OutlineInputBorder(), suffixIcon: Icon(Icons.calendar_today)), " +
+                   "onTap: () async { final picked = await showDatePicker(context: context, initialDate: DateTime.tryParse(" + controllerVar + ".text) ?? DateTime.now(), firstDate: DateTime(1900), lastDate: DateTime(2100)); " +
+                   "if (picked != null) " + controllerVar + ".text = picked.toIso8601String().substring(0, 10); })),";
         var keyboard = tk switch { "integer" => " keyboardType: TextInputType.number,", "float" => " keyboardType: const TextInputType.numberWithOptions(decimal: true),", _ => "" };
         return "                Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: " + controllerVar + ", decoration: const InputDecoration(labelText: '" + label + "', border: OutlineInputBorder())," + keyboard + ")),";
     }
@@ -544,7 +549,7 @@ public class FlutterCodeGenerator
         var viewWidgets = views.Select(v => $"            {v.Label}View(controller: {CtrlVar(v.Controller!)}),");
         var viewPresenters = views.Select(v => PresVar(v.Presenter!));
         var viewTiles = views.Select((v, i) =>
-            $"          ListTile(title: const Text('{v.Label}'), onTap: () => _openForDiagnostics(context, {i}, {v.Label}View(controller: {CtrlVar(v.Controller!)}))),");
+            $"          ListTile(title: const Text('{v.Title}'), onTap: () => _openForDiagnostics(context, {i}, {v.Label}View(controller: {CtrlVar(v.Controller!)}))),");
 
         var content = FillTemplate(LoadTemplate("App.txt"),
             ("Imports", string.Join("\n", imports)),

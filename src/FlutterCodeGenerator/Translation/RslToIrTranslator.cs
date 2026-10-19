@@ -116,6 +116,7 @@ public class RslToIrTranslator
         }
         EnsureCheckResultEnums(ir, ctx);
 
+        ApplyViewAndTriggerDefinitions(notions, ir, ctx);
         foreach (var ucc in ir.UseCases)
         {
             MakeOperationLabelsUnique(ucc);
@@ -236,6 +237,49 @@ public class RslToIrTranslator
             Decision d => d.Conditions.SelectMany(c => UsedParameterTypes(c.Instructions)),
             _ => Enumerable.Empty<string>()
         });
+
+    /// <summary>Etykiety i typy z definicji View/Trigger; nazwa odnosi się do pojęcia ze zdań &lt;show&gt;/&lt;select&gt;.</summary>
+    private static void ApplyViewAndTriggerDefinitions(List<NotionDef> notions, IrModel ir, TranslationContext ctx)
+    {
+        foreach (var vn in notions.OfType<ViewNotion>())
+            foreach (var nl in vn.NamesAndLabels)
+            {
+                var view = ir.Views.FirstOrDefault(v => v.Label == ToPascalCase(nl.Name));
+                if (view == null)
+                {
+                    ctx.Warnings.Add($"Definicja View „{nl.Name}” nie odpowiada żadnemu widokowi ze zdań <show>.");
+                    continue;
+                }
+                view.ViewType = vn.ViewType;
+                view.UiLabel = nl.UiLabel ?? view.UiLabel;
+            }
+        foreach (var tn in notions.OfType<TriggerNotion>())
+            foreach (var nl in tn.NamesAndLabels)
+            {
+                var triggers = ir.Views.SelectMany(v => v.Triggers).Where(t => t.Label == ToCamelCase(nl.Name)).ToList();
+                if (triggers.Count == 0)
+                    ctx.Warnings.Add($"Definicja Trigger „{nl.Name}” nie odpowiada żadnemu wyzwalaczowi ze zdań <select> ani <invoke>.");
+                foreach (var t in triggers)
+                {
+                    t.Type = tn.TriggerType ?? t.Type;
+                    t.UiLabel = nl.UiLabel ?? t.UiLabel;
+                }
+            }
+    }
+
+    /// <summary>&lt;close&gt; ukrywa wskazany widok.</summary>
+    private static void ProcessCloseSentence(string notion, IrModel ir, TranslationContext ctx)
+    {
+        var view = ir.Views.FirstOrDefault(v => v.Label == ToPascalCase(notion));
+        if (view?.Presenter == null)
+        {
+            ctx.Warnings.Add($"Przypadek użycia „{ctx.CurrentUseCaseName}”: <close> {notion} – widoku nie wyświetlono wcześniej zdaniem <show>.");
+            return;
+        }
+        if (ctx.CurrentUCC != null && !ctx.CurrentUCC.Presenters.Contains(view.Presenter))
+            ctx.CurrentUCC.Presenters.Add(view.Presenter);
+        AddInstruction(new Call { Label = ctx.CurrentLabel, OperationRef = "hide", Presenter = view.Presenter }, ctx);
+    }
 
     private void ProcessUseCaseClause(UseCase uc, IrModel ir, TranslationContext ctx)
     {
@@ -374,8 +418,8 @@ public class RslToIrTranslator
         {
             if (sys.Predicate is ShowPredicate sh)
                 ProcessShowSentence(sh.Notion, ir, ctx);
-            else if (sys.Predicate is ClosePredicate)
-                { /* nawigacja wstecz – można dodać End lub nic */ }
+            else if (sys.Predicate is ClosePredicate cl)
+                ProcessCloseSentence(cl.Notion, ir, ctx);
             else if (sys.Predicate is ReadPredicate r)
                 ProcessSystemDataSentence(PredicateType.Read, r.Notion, ir, ctx);
             else if (sys.Predicate is UpdatePredicate u)

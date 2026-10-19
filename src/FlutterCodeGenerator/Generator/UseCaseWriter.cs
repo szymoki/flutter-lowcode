@@ -158,6 +158,8 @@ internal class UseCaseWriter
         {
             switch (instr)
             {
+                case Call c when c.Presenter != null && c.OperationRef == "hide":
+                    break;
                 case Call c when c.Presenter != null:
                     _usesHideViews = true;
                     foreach (var p in c.Parameters) _dataFields.Add(p.Type);
@@ -198,6 +200,9 @@ internal class UseCaseWriter
             var isLast = i == instructions.Count - 1;
             switch (instructions[i])
             {
+                case Call c when c.Presenter != null && c.OperationRef == "hide":
+                    sb.Append($"{indent}{PresenterField(c.Presenter)}.hide();\n");
+                    break;
                 case Call c when c.Presenter != null:
                     var presenterArgs = string.Join(", ", c.Parameters.Select(p => $"{Naming.LowerFirst(p.Type)}: {DataField(p.Type)}"));
                     sb.Append($"{indent}_hideViews();\n{indent}{PresenterField(c.Presenter)}.{c.OperationRef}({presenterArgs});\n");
