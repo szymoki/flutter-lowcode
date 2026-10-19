@@ -6,6 +6,7 @@ namespace FlutterCodeGenerator.Translation;
 public class RslToIrTranslator
 {
     public List<string> Warnings { get; } = new();
+    public List<string> Errors { get; } = new();
 
     private static string ToPascalCase(string s) => Naming.Pascal(s);
 
@@ -69,21 +70,6 @@ public class RslToIrTranslator
         return new Call { Label = instr.Label };
     }
 
-    private static UCOperation? FindOperationByLabel(string label, TranslationContext ctx)
-    {
-        if (ctx.CurrentUCC == null) return null;
-        foreach (var op in ctx.CurrentUCC.Operations)
-        {
-            if (op.Label == label) return op;
-            foreach (var instr in op.Instructions.OfType<Decision>())
-                foreach (var cond in instr.Conditions)
-                    foreach (var i in cond.Instructions)
-                        if (i is Call call && call.Label == label)
-                            return op;
-        }
-        return null;
-    }
-
     public IrModel Translate(List<UseCase> useCases, List<NotionDef> notions)
     {
         var ir = new IrModel();
@@ -113,6 +99,7 @@ public class RslToIrTranslator
         foreach (var ucc in ir.UseCases)
             MakeOperationLabelsUnique(ucc);
         Warnings.AddRange(ctx.Warnings);
+        Errors.AddRange(ctx.Errors);
         return ir;
     }
 
@@ -144,7 +131,13 @@ public class RslToIrTranslator
         };
         ir.UseCases.Add(ucc);
         ctx.CurrentUCC = ucc;
+        ctx.CurrentUseCaseName = uc.Name;
         ctx.ContextDA.Clear();
+        ctx.LabelSnapshots.Clear();
+        ctx.CurrentVF = null;
+        ctx.CurrentCondition = null;
+        ctx.CurrentDAP.Clear();
+        ctx.CurrentDAD.Clear();
 
         var initOp = new UCOperation { Label = "execute", IsInitial = true };
         ucc.Operations.Add(initOp);
@@ -185,7 +178,22 @@ public class RslToIrTranslator
 
     private void ProcessScenario(Scenario scenario, IrModel ir, TranslationContext ctx)
     {
-        ctx.CurrentLabel = scenario.RepLabel ?? scenario.RepAltLabel ?? "";
+        var repLabel = scenario.RepLabel ?? scenario.RepAltLabel ?? "";
+        if (!ctx.LabelSnapshots.TryGetValue(repLabel, out var snapshot))
+        {
+            ctx.Errors.Add($"Przypadek użycia „{ctx.CurrentUseCaseName}”: scenariusz alternatywny powtarza etykietę {repLabel}, " +
+                           "której nie ma wcześniej w tym przypadku użycia.");
+            return;
+        }
+        ctx.CurrentVF = snapshot.CurrentVF;
+        ctx.CurrentUCO = snapshot.CurrentUCO;
+        ctx.CurrentCondition = snapshot.CurrentCondition;
+        ctx.CurrentDAP.Clear();
+        ctx.CurrentDAP.AddRange(snapshot.CurrentDAP);
+        ctx.CurrentDAD.Clear();
+        ctx.CurrentDAD.AddRange(snapshot.CurrentDAD);
+        ctx.CurrentLabel = repLabel;
+
         foreach (var sent in scenario.AltSentences)
             ProcessSentence(sent, ir, ctx);
         ProcessEndSentence(scenario.EndSentence, ir, ctx);
@@ -195,36 +203,21 @@ public class RslToIrTranslator
     {
         if (sent is SvoSentence svo)
         {
-            ctx.CurrentLabel = svo.Label ?? svo.AltLabel ?? "";
-            if (svo.Step is UserStep user)
-            {
-                if (user.Predicate is SelectPredicate sel)
-                    ProcessSelectSentence(user.Actor, sel.Notion, ctx.CurrentUCO?.IsInitial ?? false, ir, ctx);
-                else if (user.Predicate is EnterPredicate ent)
-                    ProcessEnterSentence(ent.Notion, ir, ctx);
-                else if (user.Predicate is InvokePredicate inv)
+            ctx.CurrentLabel = !string.IsNullOrEmpty(svo.Label) ? svo.Label : svo.AltLabel ?? "";
+            var positionList = svo.Step is SystemStep ? CurrentInstructionList(ctx) : null;
+            var positionIndex = positionList?.Count ?? 0;
+            ProcessSvoSentence(svo, ir, ctx);
+            if (ctx.CurrentLabel != "")
+                ctx.LabelSnapshots[ctx.CurrentLabel] = new LabelSnapshot
                 {
-                    foreach (var name in inv.Names)
-                        ctx.ScheduledInvocations.Add((ToPascalCase(name), () => { }));
-                }
-            }
-            else if (svo.Step is SystemStep sys)
-            {
-                if (sys.Predicate is ShowPredicate sh)
-                    ProcessShowSentence(sh.Notion, ir, ctx);
-                else if (sys.Predicate is ClosePredicate)
-                    { /* nawigacja wstecz – można dodać End lub nic */ }
-                else if (sys.Predicate is ReadPredicate r)
-                    ProcessSystemDataSentence(PredicateType.Read, r.Notion, ir, ctx);
-                else if (sys.Predicate is UpdatePredicate u)
-                    ProcessSystemDataSentence(PredicateType.Update, u.Notion, ir, ctx);
-                else if (sys.Predicate is DeletePredicate d)
-                    ProcessSystemDataSentence(PredicateType.Delete, d.Notion, ir, ctx);
-                else if (sys.Predicate is CheckPredicate ch)
-                    ProcessSystemDataSentence(PredicateType.Check, ch.Notion, ir, ctx);
-                else if (sys.Predicate is ExecutePredicate e)
-                    ProcessSystemDataSentence(PredicateType.Execute, e.Notion, ir, ctx);
-            }
+                    CurrentVF = ctx.CurrentVF,
+                    CurrentUCO = ctx.CurrentUCO,
+                    CurrentCondition = ctx.CurrentCondition,
+                    CurrentDAP = ctx.CurrentDAP.ToList(),
+                    CurrentDAD = ctx.CurrentDAD.ToList(),
+                    InstructionList = positionList,
+                    InstructionIndex = positionIndex
+                };
         }
         else if (sent is CondSentence cond)
         {
@@ -235,6 +228,42 @@ public class RslToIrTranslator
                 return new Expression { Notion = (c as ContextCondition)?.Notion ?? "", Val = "" };
             }).ToList();
             ProcessConditionSentence(exprs, ir, ctx);
+        }
+    }
+
+    private static List<Instruction>? CurrentInstructionList(TranslationContext ctx) =>
+        ctx.CurrentCondition?.Instructions ?? ctx.CurrentUCO?.Instructions;
+
+    private void ProcessSvoSentence(SvoSentence svo, IrModel ir, TranslationContext ctx)
+    {
+        if (svo.Step is UserStep user)
+        {
+            if (user.Predicate is SelectPredicate sel)
+                ProcessSelectSentence(user.Actor, sel.Notion, ctx.CurrentUCO?.IsInitial ?? false, ir, ctx);
+            else if (user.Predicate is EnterPredicate ent)
+                ProcessEnterSentence(ent.Notion, ir, ctx);
+            else if (user.Predicate is InvokePredicate inv)
+            {
+                foreach (var name in inv.Names)
+                    ctx.ScheduledInvocations.Add((ToPascalCase(name), () => { }));
+            }
+        }
+        else if (svo.Step is SystemStep sys)
+        {
+            if (sys.Predicate is ShowPredicate sh)
+                ProcessShowSentence(sh.Notion, ir, ctx);
+            else if (sys.Predicate is ClosePredicate)
+                { /* nawigacja wstecz – można dodać End lub nic */ }
+            else if (sys.Predicate is ReadPredicate r)
+                ProcessSystemDataSentence(PredicateType.Read, r.Notion, ir, ctx);
+            else if (sys.Predicate is UpdatePredicate u)
+                ProcessSystemDataSentence(PredicateType.Update, u.Notion, ir, ctx);
+            else if (sys.Predicate is DeletePredicate d)
+                ProcessSystemDataSentence(PredicateType.Delete, d.Notion, ir, ctx);
+            else if (sys.Predicate is CheckPredicate ch)
+                ProcessSystemDataSentence(PredicateType.Check, ch.Notion, ir, ctx);
+            else if (sys.Predicate is ExecutePredicate e)
+                ProcessSystemDataSentence(PredicateType.Execute, e.Notion, ir, ctx);
         }
     }
 
@@ -302,6 +331,8 @@ public class RslToIrTranslator
         };
         ctx.CurrentUCC?.Operations.Add(ucOp);
         ctx.CurrentUCO = ucOp;
+        // Nowa operacja zaczyna się poza gałęzią decyzji poprzedniej operacji.
+        ctx.CurrentCondition = null;
 
         if (ctx.CurrentVF != null)
             AddTrigger(ctx.CurrentVF, notion, ucOp, ctx.CurrentUCC, ctx);
@@ -370,20 +401,31 @@ public class RslToIrTranslator
             var endInstr = new End { ReturnValue = new Value { Label = end.ReturnValue } };
             AddInstruction(endInstr, ctx);
         }
-        ctx.CurrentCondition = null;
-
+        // Kopia instrukcji z rejoin trafia do gałęzi, w której stoi zdanie końcowe.
         if (end.IsRejoin && !string.IsNullOrEmpty(end.RejoinLabel))
             ProcessRejoinSentence(end.RejoinLabel, ctx);
+        ctx.CurrentCondition = null;
     }
 
     private void ProcessRejoinSentence(string label, TranslationContext ctx)
     {
-        var targetOp = FindOperationByLabel(label, ctx);
-        if (targetOp != null)
+        if (!ctx.LabelSnapshots.TryGetValue(label, out var target))
         {
-            foreach (var instr in targetOp.Instructions)
-                AddInstruction(CloneInstruction(instr), ctx);
+            ctx.Errors.Add($"Przypadek użycia „{ctx.CurrentUseCaseName}”: rejoin {label} wskazuje etykietę, której nie ma w tym przypadku użycia.");
+            return;
         }
+        if (ctx.CurrentUCO != null)
+            ctx.CurrentUCO.ReturnTo = label;
+
+        var current = CurrentInstructionList(ctx);
+        // Powrót do wcześniejszego miejsca tej samej listy instrukcji to pętla – kopia
+        // zdublowałaby wywołania (D4.2). Zdanie aktora nie ma instrukcji do skopiowania.
+        if (target.InstructionList == null || ReferenceEquals(target.InstructionList, current))
+            return;
+
+        var toCopy = target.InstructionList.Skip(target.InstructionIndex).ToList();
+        foreach (var instr in toCopy)
+            AddInstruction(CloneInstruction(instr), ctx);
     }
 
     private void ProcessScheduledInvocations(IrModel ir, TranslationContext ctx)

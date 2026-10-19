@@ -7,4 +7,5 @@ class CAddOrderForm {
   CAddOrderForm({required AddOrderUseCase addOrderUseCase}) : _addOrderUseCase = addOrderUseCase;
 
   void onAdd() { _addOrderUseCase.handleAdd(); }
+  void onCancel() { _addOrderUseCase.handleCancel(); }
 }

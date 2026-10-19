@@ -43,7 +43,6 @@ class _OrderDeletedMessageViewState extends State<OrderDeletedMessageView> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 ElevatedButton(onPressed: () => widget.controller.onOk(), child: const Text('ok')),
-                ElevatedButton(onPressed: () => widget.controller.onCancel(), child: const Text('cancel')),
               ],
             ),
           ),

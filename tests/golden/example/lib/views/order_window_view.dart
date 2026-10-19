@@ -44,7 +44,6 @@ class _OrderWindowViewState extends State<OrderWindowView> {
               children: [
                 Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: _titleController, decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder()),)),
                 ElevatedButton(onPressed: () => widget.controller.onClose(), child: const Text('close')),
-                ElevatedButton(onPressed: () => widget.controller.onCancel(), child: const Text('cancel')),
               ],
             ),
           ),

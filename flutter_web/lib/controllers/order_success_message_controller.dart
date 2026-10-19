@@ -7,5 +7,4 @@ class COrderSuccessMessage {
   COrderSuccessMessage({required AddOrderUseCase addOrderUseCase}) : _addOrderUseCase = addOrderUseCase;
 
   void onOk() { _addOrderUseCase.handleOk(); }
-  void onCancel() { _addOrderUseCase.handleCancel(); }
 }

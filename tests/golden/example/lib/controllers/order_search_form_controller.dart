@@ -7,4 +7,5 @@ class COrderSearchForm {
   COrderSearchForm({required FindOrderUseCase findOrderUseCase}) : _findOrderUseCase = findOrderUseCase;
 
   void onSearch() { _findOrderUseCase.handleSearch(); }
+  void onCancel() { _findOrderUseCase.handleCancel(); }
 }

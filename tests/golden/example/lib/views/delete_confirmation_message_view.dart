@@ -43,6 +43,7 @@ class _DeleteConfirmationMessageViewState extends State<DeleteConfirmationMessag
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 ElevatedButton(onPressed: () => widget.controller.onDelete(), child: const Text('delete')),
+                ElevatedButton(onPressed: () => widget.controller.onCancel(), child: const Text('cancel')),
               ],
             ),
           ),

@@ -7,4 +7,5 @@ class CDeleteConfirmationMessage {
   CDeleteConfirmationMessage({required DeleteOrderUseCase deleteOrderUseCase}) : _deleteOrderUseCase = deleteOrderUseCase;
 
   void onDelete() { _deleteOrderUseCase.handleDelete(); }
+  void onCancel() { _deleteOrderUseCase.handleCancel(); }
 }

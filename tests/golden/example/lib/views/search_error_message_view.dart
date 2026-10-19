@@ -14,7 +14,7 @@ class SearchErrorMessageView extends StatefulWidget {
 }
 
 class _SearchErrorMessageViewState extends State<SearchErrorMessageView> {
-
+  final _titleController = TextEditingController();
 
   @override
   void initState() {
@@ -26,7 +26,7 @@ class _SearchErrorMessageViewState extends State<SearchErrorMessageView> {
 
   @override
   void dispose() {
-
+    _titleController.dispose();
     super.dispose();
   }
 
@@ -42,8 +42,8 @@ class _SearchErrorMessageViewState extends State<SearchErrorMessageView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: _titleController, decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder()),)),
                 ElevatedButton(onPressed: () => widget.controller.onClose(), child: const Text('close')),
-                ElevatedButton(onPressed: () => widget.controller.onShowOrderList(), child: const Text('showOrderList')),
               ],
             ),
           ),

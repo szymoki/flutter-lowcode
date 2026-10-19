@@ -7,5 +7,4 @@ class COrderDeletedMessage {
   COrderDeletedMessage({required DeleteOrderUseCase deleteOrderUseCase}) : _deleteOrderUseCase = deleteOrderUseCase;
 
   void onOk() { _deleteOrderUseCase.handleOk(); }
-  void onCancel() { _deleteOrderUseCase.handleCancel(); }
 }

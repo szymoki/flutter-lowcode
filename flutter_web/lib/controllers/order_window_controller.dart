@@ -7,5 +7,4 @@ class COrderWindow {
   COrderWindow({required FindOrderUseCase findOrderUseCase}) : _findOrderUseCase = findOrderUseCase;
 
   void onClose() { _findOrderUseCase.handleCloseOrderWindow(); }
-  void onCancel() { _findOrderUseCase.handleCancel(); }
 }

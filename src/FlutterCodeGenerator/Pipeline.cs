@@ -51,6 +51,9 @@ public static class Pipeline
         var translator = new RslToIrTranslator();
         var irModel = translator.Translate(useCases, notions);
         result.Warnings.AddRange(translator.Warnings);
+        result.Errors.AddRange(translator.Errors);
+        if (!result.Success)
+            return result;
         result.Ir = irModel;
 
         Directory.CreateDirectory(outputFolder);
@@ -97,6 +100,7 @@ public static class Pipeline
             var translator = new RslToIrTranslator();
             result.Ir = translator.Translate(useCases.ToList(), notions.ToList());
             result.Warnings.AddRange(translator.Warnings);
+            result.Errors.AddRange(translator.Errors);
         }
         return result;
     }

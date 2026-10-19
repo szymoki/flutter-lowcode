@@ -41,9 +41,9 @@ public class Stage3UseCaseOperationTests
     public void Controller_CallsTargetUseCase()
     {
         using var p = GeneratedProject.FromExample();
-        var mainMenu = p.Read("controllers/main_menu_controller.dart");
-        Assert.Contains("void onFindOrder() { _findOrderUseCase.handleFindOrder(); }", mainMenu);
-        Assert.Contains("required FindOrderUseCase findOrderUseCase", mainMenu);
+        var orderWindow = p.Read("controllers/order_window_controller.dart");
+        Assert.Contains("void onClose() { _findOrderUseCase.handleCloseOrderWindow(); }", orderWindow);
+        Assert.Contains("required FindOrderUseCase findOrderUseCase", orderWindow);
     }
 
     [Fact]
