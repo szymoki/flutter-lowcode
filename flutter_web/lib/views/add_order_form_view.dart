@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../presenters/padd_order_form_presenter.dart';
 import '../controllers/add_order_form_controller.dart';
+import '../models/order.dart';
 
 class AddOrderFormView extends StatefulWidget {
   final CAddOrderForm controller;
@@ -14,24 +15,29 @@ class AddOrderFormView extends StatefulWidget {
 }
 
 class _AddOrderFormViewState extends State<AddOrderFormView> {
-  final _numberController = TextEditingController();
-  final _titleController = TextEditingController();
-  final _datesController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<PAddOrderForm>().show();
-    });
-  }
+  final _orderNumberController = TextEditingController();
+  final _orderTitleController = TextEditingController();
+  final _orderDatesController = TextEditingController();
 
   @override
   void dispose() {
-    _numberController.dispose();
-    _titleController.dispose();
-    _datesController.dispose();
+    _orderNumberController.dispose();
+    _orderTitleController.dispose();
+    _orderDatesController.dispose();
     super.dispose();
+  }
+
+  Order? _buildOrder() {
+    final number = int.tryParse(_orderNumberController.text);
+    if (number == null) {
+      _showInvalidValue('Number');
+      return null;
+    }
+    return Order(number: number, title: _orderTitleController.text, dates: _orderDatesController.text);
+  }
+
+  void _showInvalidValue(String field) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Nieprawidłowa wartość pola $field')));
   }
 
   @override
@@ -43,13 +49,13 @@ class _AddOrderFormViewState extends State<AddOrderFormView> {
           appBar: AppBar(title: const Text('AddOrderForm')),
           body: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: ListView(
               children: [
-                Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: _numberController, decoration: const InputDecoration(labelText: 'Number', border: OutlineInputBorder()), keyboardType: TextInputType.number,)),
-                Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: _titleController, decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder()),)),
-                Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: _datesController, decoration: const InputDecoration(labelText: 'Dates', border: OutlineInputBorder()),)),
-                ElevatedButton(onPressed: () => widget.controller.onAdd(), child: const Text('add')),
+                Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: _orderNumberController, decoration: const InputDecoration(labelText: 'Number', border: OutlineInputBorder()), keyboardType: TextInputType.number,)),
+                Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: _orderTitleController, decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder()),)),
+                Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: _orderDatesController, decoration: const InputDecoration(labelText: 'Dates', border: OutlineInputBorder()),)),
+                ElevatedButton(onPressed: () { final order = _buildOrder(); if (order == null) return; widget.controller.onAdd(order); }, child: const Text('add')),
+                ElevatedButton(onPressed: () => widget.controller.onCancel(), child: const Text('cancel')),
               ],
             ),
           ),

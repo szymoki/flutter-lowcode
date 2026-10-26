@@ -17,14 +17,6 @@ class _SearchErrorMessageViewState extends State<SearchErrorMessageView> {
 
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<PSearchErrorMessage>().show();
-    });
-  }
-
-  @override
   void dispose() {
 
     super.dispose();
@@ -39,11 +31,9 @@ class _SearchErrorMessageViewState extends State<SearchErrorMessageView> {
           appBar: AppBar(title: const Text('SearchErrorMessage')),
           body: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: ListView(
               children: [
                 ElevatedButton(onPressed: () => widget.controller.onClose(), child: const Text('close')),
-                ElevatedButton(onPressed: () => widget.controller.onShowOrderList(), child: const Text('showOrderList')),
               ],
             ),
           ),

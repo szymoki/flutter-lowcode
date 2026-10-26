@@ -1,0 +1,9 @@
+Use case Find item Main scenario
+00: Clerk <select> find item
+01: System <show> item form
+02: Clerk <enter> item
+03: Clerk <select> search
+04: System <check> item
+[item ? - valid]
+05: System <show> item error message
+-> end ! notOK

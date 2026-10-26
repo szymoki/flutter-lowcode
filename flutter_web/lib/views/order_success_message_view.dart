@@ -14,23 +14,11 @@ class OrderSuccessMessageView extends StatefulWidget {
 }
 
 class _OrderSuccessMessageViewState extends State<OrderSuccessMessageView> {
-  final _numberController = TextEditingController();
-  final _titleController = TextEditingController();
-  final _datesController = TextEditingController();
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<POrderSuccessMessage>().show();
-    });
-  }
 
   @override
   void dispose() {
-    _numberController.dispose();
-    _titleController.dispose();
-    _datesController.dispose();
+
     super.dispose();
   }
 
@@ -43,14 +31,9 @@ class _OrderSuccessMessageViewState extends State<OrderSuccessMessageView> {
           appBar: AppBar(title: const Text('OrderSuccessMessage')),
           body: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: ListView(
               children: [
-                Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: _numberController, decoration: const InputDecoration(labelText: 'Number', border: OutlineInputBorder()), keyboardType: TextInputType.number,)),
-                Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: _titleController, decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder()),)),
-                Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: _datesController, decoration: const InputDecoration(labelText: 'Dates', border: OutlineInputBorder()),)),
                 ElevatedButton(onPressed: () => widget.controller.onOk(), child: const Text('ok')),
-                ElevatedButton(onPressed: () => widget.controller.onCancel(), child: const Text('cancel')),
               ],
             ),
           ),

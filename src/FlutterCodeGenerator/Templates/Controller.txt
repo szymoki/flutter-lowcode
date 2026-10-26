@@ -1,10 +1,10 @@
 // Generated from IR
-import '../use_cases/{{UseCaseSnake}}_use_case.dart';
+{{UseCaseImports}}
 
 class {{ControllerName}} {
-  final {{UseCaseName}}UseCase _useCase;
+{{Fields}}
 
-  {{ControllerName}}({required {{UseCaseName}}UseCase useCase}) : _useCase = useCase;
+  {{ControllerName}}({{ConstructorParams}}){{InitializerList}};
 
 {{Methods}}
 }

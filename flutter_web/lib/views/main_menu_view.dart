@@ -17,14 +17,6 @@ class _MainMenuViewState extends State<MainMenuView> {
 
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<PMainMenu>().show();
-    });
-  }
-
-  @override
   void dispose() {
 
     super.dispose();
@@ -39,10 +31,11 @@ class _MainMenuViewState extends State<MainMenuView> {
           appBar: AppBar(title: const Text('MainMenu')),
           body: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: ListView(
               children: [
+                ElevatedButton(onPressed: () => widget.controller.onShowOrderList(), child: const Text('showOrderList')),
                 ElevatedButton(onPressed: () => widget.controller.onFindOrder(), child: const Text('findOrder')),
+                ElevatedButton(onPressed: () => widget.controller.onAddOrder(), child: const Text('addOrder')),
               ],
             ),
           ),

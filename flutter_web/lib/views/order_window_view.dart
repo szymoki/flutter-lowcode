@@ -14,19 +14,11 @@ class OrderWindowView extends StatefulWidget {
 }
 
 class _OrderWindowViewState extends State<OrderWindowView> {
-  final _titleController = TextEditingController();
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<POrderWindow>().show();
-    });
-  }
 
   @override
   void dispose() {
-    _titleController.dispose();
+
     super.dispose();
   }
 
@@ -39,12 +31,12 @@ class _OrderWindowViewState extends State<OrderWindowView> {
           appBar: AppBar(title: const Text('OrderWindow')),
           body: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: ListView(
               children: [
-                Padding(padding: const EdgeInsets.only(bottom: 8.0), child: TextField(controller: _titleController, decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder()),)),
+                ListTile(title: const Text('Number'), subtitle: Text('${presenter.order?.number ?? ''}')),
+                ListTile(title: const Text('Title'), subtitle: Text('${presenter.order?.title ?? ''}')),
+                ListTile(title: const Text('Dates'), subtitle: Text('${presenter.order?.dates ?? ''}')),
                 ElevatedButton(onPressed: () => widget.controller.onClose(), child: const Text('close')),
-                ElevatedButton(onPressed: () => widget.controller.onCancel(), child: const Text('cancel')),
               ],
             ),
           ),

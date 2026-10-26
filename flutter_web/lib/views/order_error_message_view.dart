@@ -17,14 +17,6 @@ class _OrderErrorMessageViewState extends State<OrderErrorMessageView> {
 
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<POrderErrorMessage>().show();
-    });
-  }
-
-  @override
   void dispose() {
 
     super.dispose();
@@ -39,12 +31,10 @@ class _OrderErrorMessageViewState extends State<OrderErrorMessageView> {
           appBar: AppBar(title: const Text('OrderErrorMessage')),
           body: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: ListView(
               children: [
                 ElevatedButton(onPressed: () => widget.controller.onClose(), child: const Text('close')),
                 ElevatedButton(onPressed: () => widget.controller.onCorrect(), child: const Text('correct')),
-                ElevatedButton(onPressed: () => widget.controller.onDeleteOrder(), child: const Text('deleteOrder')),
               ],
             ),
           ),

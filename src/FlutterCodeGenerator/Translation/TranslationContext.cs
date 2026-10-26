@@ -1,4 +1,5 @@
 using FlutterCodeGenerator.Model.Ir;
+using FlutterCodeGenerator.Model.Rsl;
 
 namespace FlutterCodeGenerator.Translation;
 
@@ -8,9 +9,27 @@ public class TranslationContext
     public UseCaseClass? CurrentUCC { get; set; }
     public List<DataAggregate> CurrentDAP { get; } = new();
     public List<DataAggregate> CurrentDAD { get; } = new();
+    /// <summary>Agregaty z warunków kontekstowych przypadku użycia; dostępne w całym przypadku użycia.</summary>
+    public List<DataAggregate> ContextDA { get; } = new();
+    /// <summary>Dane z &lt;enter&gt; przed pierwszym &lt;show&gt; przypadku użycia; trafiają do następnego widoku.</summary>
+    public List<DataAggregate> PendingEditable { get; } = new();
     public string CurrentLabel { get; set; } = "";
     public UCOperation? CurrentUCO { get; set; }
     public Condition? CurrentCondition { get; set; }
+    /// <summary>Po &lt;invoke&gt; instrukcje trafiają do kontynuacji tej operacji zamiast do jej ciała.</summary>
+    public UCOperation? ResumeOperation { get; set; }
     public Dictionary<string, ViewWidget> LabelToVF { get; } = new();
-    public List<(string UcName, Action Attach)> ScheduledInvocations { get; } = new();
+    /// <summary>Migawki stanu po zdaniach z etykietą; etykiety są lokalne dla przypadku użycia.</summary>
+    public Dictionary<string, LabelSnapshot> LabelSnapshots { get; } = new();
+    public string CurrentUseCaseName { get; set; } = "";
+    /// <summary>Klasy przypadków użycia według nazwy RSL, utworzone przed translacją scenariuszy.</summary>
+    public Dictionary<string, UseCaseClass> UseCaseByName { get; } = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Pierwsze zdanie scenariusza głównego bieżącego przypadku użycia.</summary>
+    public Sentence? FirstSentence { get; set; }
+    /// <summary>Pojęcia sprawdzane zdaniem &lt;check&gt; w bieżącym przypadku użycia.</summary>
+    public List<string> CheckedNotions { get; } = new();
+    /// <summary>Warunki wartości (pojęcie, wartość) z bieżącego przypadku użycia.</summary>
+    public List<(string Notion, string Value)> ValueConditions { get; } = new();
+    public List<string> Warnings { get; } = new();
+    public List<string> Errors { get; } = new();
 }

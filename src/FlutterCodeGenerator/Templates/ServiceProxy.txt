@@ -1,7 +1,8 @@
+{{Marker}}
 // Generated from IR - stub for developer
 import '{{InterfaceFile}}';
 {{ModelImports}}
 
-class {{NotionName}}ServiceProxy implements {{InterfaceName}} {
+class {{ProxyClass}} implements {{InterfaceName}} {
 {{ProxyMethods}}
 }

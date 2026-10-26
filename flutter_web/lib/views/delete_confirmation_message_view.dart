@@ -17,14 +17,6 @@ class _DeleteConfirmationMessageViewState extends State<DeleteConfirmationMessag
 
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<PDeleteConfirmationMessage>().show();
-    });
-  }
-
-  @override
   void dispose() {
 
     super.dispose();
@@ -39,10 +31,10 @@ class _DeleteConfirmationMessageViewState extends State<DeleteConfirmationMessag
           appBar: AppBar(title: const Text('DeleteConfirmationMessage')),
           body: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: ListView(
               children: [
                 ElevatedButton(onPressed: () => widget.controller.onDelete(), child: const Text('delete')),
+                ElevatedButton(onPressed: () => widget.controller.onCancel(), child: const Text('cancel')),
               ],
             ),
           ),

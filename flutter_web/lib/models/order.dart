@@ -10,7 +10,7 @@ class Order {
     required this.dates
   });
 
-  Order copyWith(int? number, String? title, String? dates) {
+  Order copyWith({int? number, String? title, String? dates}) {
     return Order(
       number: number ?? this.number,
       title: title ?? this.title,

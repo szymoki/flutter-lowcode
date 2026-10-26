@@ -3,6 +3,8 @@ namespace FlutterCodeGenerator.Model.Ir;
 public class ServiceInterface
 {
     public string Label { get; set; } = "";
+    /// <summary>Oryginalna nazwa pojęcia RSL („order search”), z której generator wyprowadza nazwy.</summary>
+    public string NotionName { get; set; } = "";
     public List<SOperation> Methods { get; } = new();
 }
 

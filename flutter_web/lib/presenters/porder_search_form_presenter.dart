@@ -1,18 +1,10 @@
 // Generated from IR
-import 'package:flutter/foundation.dart';
+import 'view_presenter.dart';
 
-
-class POrderSearchForm extends ChangeNotifier {
-  bool _isVisible = false;
-  bool get isVisible => _isVisible;
+class POrderSearchForm extends ViewPresenter {
 
 
   void showOrderSearchForm() {
-    notifyListeners();
+    show();
   }
-
-
-  void show() { _isVisible = true; notifyListeners(); }
-  void hide() { _isVisible = false; notifyListeners(); }
-  void clear() { _isVisible = false; notifyListeners(); }
 }

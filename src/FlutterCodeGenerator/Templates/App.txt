@@ -1,42 +1,84 @@
 // Generated from IR
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-{{PresenterImports}}
-{{UseCaseImports}}
-{{ControllerImports}}
-{{ViewImports}}
-{{ServiceProxyImports}}
+{{Imports}}
 
 class App extends StatefulWidget {
-  const App({super.key});
+  /// Tryb diagnostyczny: lista wszystkich widoków zamiast przebiegu od przypadku użycia Start.
+  final bool viewListMode;
+
+  const App({super.key, this.viewListMode = false});
 
   @override
   State<App> createState() => _AppState();
 }
 
 class _AppState extends State<App> {
-{{UseCaseFields}}
-{{ControllerFields}}
+{{Fields}}
+  late final List<ViewPresenter> _viewPresenters;
+  bool _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialized) return;
+    _initialized = true;
+
+{{PresenterReads}}
+{{ServiceCreations}}
+{{UseCaseCreations}}
+{{UseCaseConnections}}
+{{ControllerCreations}}
+    _viewPresenters = [{{ViewPresenters}}];
+
+    if (!widget.viewListMode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => {{StartCall}});
+    }
+  }
+
+  /// Indeks widoku na wierzchu: widocznego i wyświetlonego najpóźniej.
+  int _topViewIndex() {
+    var top = -1;
+    for (var i = 0; i < _viewPresenters.length; i++) {
+      final p = _viewPresenters[i];
+      if (p.isVisible && (top < 0 || p.shownAt > _viewPresenters[top].shownAt)) top = i;
+    }
+    return top;
+  }
 
   @override
   Widget build(BuildContext context) {
-    if ({{UseCaseNullCheck}}) {
-      {{PresenterReads}}
-      {{ServiceCreations}}
-{{UseCaseCreations}}
-      {{ControllerCreations}}
-      WidgetsBinding.instance.addPostFrameCallback((_) => setState(() {}));
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
+    if (widget.viewListMode) return _buildViewList(context);
+    return ListenableBuilder(
+      listenable: Listenable.merge(_viewPresenters),
+      builder: (context, _) {
+        final index = _topViewIndex();
+        if (index < 0) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        return IndexedStack(
+          index: index,
+          children: [
+{{ViewWidgets}}
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildViewList(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Use cases')),
+      appBar: AppBar(title: const Text('Views')),
       body: ListView(
         children: [
 {{ViewTiles}}
         ],
       ),
     );
+  }
+
+  void _openForDiagnostics(BuildContext context, int index, Widget view) {
+    _viewPresenters[index].show();
+    Navigator.push(context, MaterialPageRoute(builder: (_) => view));
   }
 }

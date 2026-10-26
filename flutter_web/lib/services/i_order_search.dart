@@ -1,7 +1,7 @@
 // Generated from IR
-import '../models/ordersearch_check_result.dart';
 import '../models/order_search.dart';
+import '../models/order_search_check_result.dart';
 
 abstract class IOrderSearch {
-  Future<OrdersearchCheckResult> checkOrderSearch(OrderSearch orderSearch);
+  Future<OrderSearchCheckResult> checkOrderSearch(OrderSearch orderSearch);
 }

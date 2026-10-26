@@ -2,11 +2,10 @@
 import '../use_cases/add_order_use_case.dart';
 
 class COrderErrorMessage {
-  final AddOrderUseCase _useCase;
+  final AddOrderUseCase _addOrderUseCase;
 
-  COrderErrorMessage({required AddOrderUseCase useCase}) : _useCase = useCase;
+  COrderErrorMessage({required AddOrderUseCase addOrderUseCase}) : _addOrderUseCase = addOrderUseCase;
 
-  void onClose() { _useCase.handleClose(); }
-  void onCorrect() { _useCase.handleCorrect(); }
-  void onDeleteOrder() { _useCase.handleDeleteOrder(); }
+  void onClose() { _addOrderUseCase.handleClose(); }
+  void onCorrect() { _addOrderUseCase.handleCorrect(); }
 }

@@ -2,10 +2,9 @@
 import '../use_cases/delete_order_use_case.dart';
 
 class COrderDeletedMessage {
-  final DeleteOrderUseCase _useCase;
+  final DeleteOrderUseCase _deleteOrderUseCase;
 
-  COrderDeletedMessage({required DeleteOrderUseCase useCase}) : _useCase = useCase;
+  COrderDeletedMessage({required DeleteOrderUseCase deleteOrderUseCase}) : _deleteOrderUseCase = deleteOrderUseCase;
 
-  void onOk() { _useCase.handleOk(); }
-  void onCancel() { _useCase.handleCancel(); }
+  void onOk() { _deleteOrderUseCase.handleOk(); }
 }

@@ -1,12 +1,20 @@
 // Generated from IR
 import '../use_cases/show_order_list_use_case.dart';
+import '../use_cases/find_order_use_case.dart';
+import '../use_cases/add_order_use_case.dart';
+import '../use_cases/delete_order_use_case.dart';
 
 class COrderListWindow {
-  final ShowOrderListUseCase _useCase;
+  final ShowOrderListUseCase _showOrderListUseCase;
+  final FindOrderUseCase _findOrderUseCase;
+  final AddOrderUseCase _addOrderUseCase;
+  final DeleteOrderUseCase _deleteOrderUseCase;
 
-  COrderListWindow({required ShowOrderListUseCase useCase}) : _useCase = useCase;
+  COrderListWindow({required ShowOrderListUseCase showOrderListUseCase, required FindOrderUseCase findOrderUseCase, required AddOrderUseCase addOrderUseCase, required DeleteOrderUseCase deleteOrderUseCase}) : _showOrderListUseCase = showOrderListUseCase, _findOrderUseCase = findOrderUseCase, _addOrderUseCase = addOrderUseCase, _deleteOrderUseCase = deleteOrderUseCase;
 
-  void onClose() { _useCase.handleClose(); }
-  void onOrderList() { _useCase.handleOrderList(); }
-  void onAddOrder() { _useCase.handleAddOrder(); }
+  void onClose() { _showOrderListUseCase.handleClose(); }
+  void onOrderList() { _showOrderListUseCase.handleOrderList(); }
+  void onFindOrder() { _findOrderUseCase.setOnEnd(_showOrderListUseCase.resumeHandleOrderList); _findOrderUseCase.handleFindOrder(); }
+  void onAddOrder() { _addOrderUseCase.setOnEnd(_showOrderListUseCase.resumeHandleOrderList); _addOrderUseCase.handleAddOrder(); }
+  void onDeleteOrder() { _deleteOrderUseCase.setOnEnd(_showOrderListUseCase.resumeHandleOrderList); _deleteOrderUseCase.handleDeleteOrder(); }
 }

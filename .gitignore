@@ -1,0 +1,14 @@
+**/bin/
+**/obj/
+flutter_web/.dart_tool/
+flutter_web/build/
+flutter_web/web/
+flutter_web/.metadata
+flutter_web/pubspec.lock
+flutter_web/analysis_options.yaml
+flutter_web/test/
+flutter_web/README.md
+flutter_web/.gitignore
+flutter_web/.idea/
+flutter_web/*.iml
+flutter_web/.flutter-plugins*

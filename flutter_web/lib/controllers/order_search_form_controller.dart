@@ -1,10 +1,12 @@
 // Generated from IR
+import '../models/order_search.dart';
 import '../use_cases/find_order_use_case.dart';
 
 class COrderSearchForm {
-  final FindOrderUseCase _useCase;
+  final FindOrderUseCase _findOrderUseCase;
 
-  COrderSearchForm({required FindOrderUseCase useCase}) : _useCase = useCase;
+  COrderSearchForm({required FindOrderUseCase findOrderUseCase}) : _findOrderUseCase = findOrderUseCase;
 
-  void onSearch() { _useCase.handleSearch(); }
+  void onSearch(OrderSearch orderSearch) { _findOrderUseCase.handleSearch(orderSearch); }
+  void onCancel() { _findOrderUseCase.handleCancel(); }
 }

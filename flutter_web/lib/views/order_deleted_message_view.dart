@@ -17,14 +17,6 @@ class _OrderDeletedMessageViewState extends State<OrderDeletedMessageView> {
 
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<POrderDeletedMessage>().show();
-    });
-  }
-
-  @override
   void dispose() {
 
     super.dispose();
@@ -39,11 +31,9 @@ class _OrderDeletedMessageViewState extends State<OrderDeletedMessageView> {
           appBar: AppBar(title: const Text('OrderDeletedMessage')),
           body: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: ListView(
               children: [
                 ElevatedButton(onPressed: () => widget.controller.onOk(), child: const Text('ok')),
-                ElevatedButton(onPressed: () => widget.controller.onCancel(), child: const Text('cancel')),
               ],
             ),
           ),
